@@ -17,13 +17,8 @@ Including another URLconf
 from django.urls import path
 from . import views
 from .api import ActualizarCEDEARsAPI, actualizar_ratio, ActualizarDolarMEPAPI, CalcularRatioPreciosAPI, ImportarAccionesAPI, guardar_accion
-from .views import ListaCedearView, ListaRatiosView, ListaAccionView,CedearAccionListView
 urlpatterns = [
-    path('lista-cedear/', ListaCedearView.as_view(), name='lista_cedear'),
-    path('lista-accion/', ListaAccionView.as_view(), name='lista_accion'),
-    path('cedears-accion/', CedearAccionListView.as_view(), name='cedears-accion'),
     path('guardar-accion/', guardar_accion, name='guardar_accion'),
-    path('calcular-ratio-precios/', ListaRatiosView.as_view(), name='lista_ratios'),
     path('api/actualizar-cedears/', ActualizarCEDEARsAPI.as_view(), name='actualizar_cedears'),
     path('api/actualizar-ratio/', actualizar_ratio, name='actualizar_ratio'),
     path('api/dolar-mep/', ActualizarDolarMEPAPI.as_view(), name='dolar-mep-api'),

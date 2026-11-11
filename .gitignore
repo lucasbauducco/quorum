@@ -1,0 +1,13 @@
+# Entornos virtuales y configuración local
+venv/
+.venv/
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Datos locales
+db.sqlite3
+celerybeat-schedule*
+*.log

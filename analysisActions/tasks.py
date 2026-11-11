@@ -1,8 +1,10 @@
 from celery import shared_task
-import requests
+
+from .api import ActualizarCEDEARsAPI
+
 
 @shared_task
 def actualizar_cedears_task():
-    url = 'http://127.0.0.1:8000//api/actualizar-cedears/'
-    response = requests.get(url)
-    return response.text
+    # Llama a la lógica directamente: antes pedía su propio endpoint por HTTP y fallaba si el servidor web no estaba levantado.
+    respuesta = ActualizarCEDEARsAPI().get(None)
+    return {'status': respuesta.status_code}
