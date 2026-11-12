@@ -1,8 +1,10 @@
-# Landgraft
+# Quórum
 
-**Comité de inversión para Argentina, en tu propio servidor.** Landgraft junta precios de BYMA, datos de Yahoo Finance y las series de ArgentinaDatos, y con eso arma un screener de acciones, CEDEAR, bonos, letras y ON; mide el riesgo de tu cartera en dólares MEP; compara pesos contra dólar y tasa fija contra CER; y te dice cuánto aportar para volver a tu objetivo sin vender nada. Cada decisión queda registrada y, después, se mide contra el mercado.
+![Python 3.12](https://img.shields.io/badge/Python-3.12-blue) ![Django 5.2](https://img.shields.io/badge/Django-5.2-092E20) ![Celery 5.7](https://img.shields.io/badge/Celery-5.7-37814A)
 
-> **Aviso.** Landgraft es una herramienta informativa. **No es asesoramiento financiero** ni una recomendación de compra o venta. Los datos vienen de fuentes públicas que pueden tener errores o retrasos. Las decisiones son tuyas.
+**Comité de inversión para Argentina, en tu propio servidor.** Quórum junta precios de BYMA, datos de Yahoo Finance y las series de ArgentinaDatos, y con eso arma un screener de acciones, CEDEAR, bonos, letras y ON; mide el riesgo de tu cartera en dólares MEP; compara pesos contra dólar y tasa fija contra CER; y te dice cuánto aportar para volver a tu objetivo sin vender nada. Cada decisión queda registrada y, después, se mide contra el mercado.
+
+> **Aviso.** Quórum es una herramienta informativa. **No es asesoramiento financiero** ni una recomendación de compra o venta. Los datos vienen de fuentes públicas que pueden tener errores o retrasos. Las decisiones son tuyas.
 
 ---
 
@@ -30,7 +32,7 @@
 
 ## Qué es
 
-Landgraft es una aplicación web en **Django** (con **Celery** para las tareas programadas) pensada para una cartera en pesos y dólares en Argentina. Tiene dos partes:
+Quórum es una aplicación web en **Django** (con **Celery** para las tareas programadas) pensada para una cartera en pesos y dólares en Argentina. Tiene dos partes:
 
 - **Un backend** que cada día hábil lee BYMA, las series de ArgentinaDatos y las cotizaciones de Yahoo Finance y CoinGecko, guarda todo en una base y corre los cálculos: screener, riesgo, estrategia y medición.
 - **Un comité en el navegador**: 14 "agentes" que revisan tu cartera. Algunos son reglas, otros son cálculos, y dos tienen poder de veto (el Guardián y el de Compliance). Cada uno explica su conclusión en lenguaje claro.
@@ -56,7 +58,7 @@ Lo que la diferencia de un simulador: **no ejecuta órdenes** y **no decide por 
 
 ## Arquitectura
 
-![Arquitectura de Landgraft](docs/arquitectura.svg)
+![Arquitectura de Quórum](docs/arquitectura.svg)
 
 El flujo tiene cuatro capas:
 
@@ -141,8 +143,8 @@ Las dependencias están fijadas en `requirements.txt`: Django 5.2, Celery 5.7, y
 ### Windows (PowerShell)
 
 ```powershell
-git clone <URL-del-repositorio> tradingMarket
-cd tradingMarket
+git clone https://github.com/lucasbauducco/quorum.git
+cd quorum
 
 # 1. Entorno virtual
 python -m venv .venv
@@ -163,8 +165,8 @@ copy .env.example .env
 ### macOS y Linux
 
 ```bash
-git clone <URL-del-repositorio> tradingMarket
-cd tradingMarket
+git clone https://github.com/lucasbauducco/quorum.git
+cd quorum
 
 python3 -m venv .venv
 source .venv/bin/activate
@@ -230,7 +232,7 @@ El comando baja los indicadores de ArgentinaDatos (tres años), los precios del 
 
 ## Puesta en marcha
 
-Landgraft necesita tres procesos. Cada uno en su terminal, con el entorno virtual activado.
+Quórum necesita tres procesos. Cada uno en su terminal, con el entorno virtual activado.
 
 **1. Servidor web**
 
@@ -238,25 +240,25 @@ Landgraft necesita tres procesos. Cada uno en su terminal, con el entorno virtua
 python manage.py runserver
 ```
 
-Abrí `http://localhost:8000/landgraft/`. Ingresá con el usuario que creaste en `createsuperuser`.
+Abrí el navegador en la ruta `/quorum/` del servidor local. Ingresá con el usuario que creaste en `createsuperuser`. El código y las novedades del proyecto están en [github.com/lucasbauducco/quorum](https://github.com/lucasbauducco/quorum).
 
 **2. Worker de Celery** (ejecuta las tareas)
 
 ```bash
 # macOS y Linux
-celery -A trading worker --loglevel=info
+celery -A config worker --loglevel=info
 
 # Windows: Celery necesita el pool "solo"
-celery -A trading worker --loglevel=info --pool=solo
+celery -A config worker --loglevel=info --pool=solo
 ```
 
 **3. Beat de Celery** (dispara las tareas en su horario)
 
 ```bash
-celery -A trading beat --loglevel=info
+celery -A config beat --loglevel=info
 ```
 
-Sin el worker, las tareas no corren. Sin el beat, no se programan. Para dispararlas a mano (con el worker levantado), usá `manage.py shell` con `from landgraft.tasks import calcular_seleccion; calcular_seleccion.delay()`.
+Sin el worker, las tareas no corren. Sin el beat, no se programan. Para dispararlas a mano (con el worker levantado), usá `manage.py shell` con `from quorum.tasks import calcular_seleccion; calcular_seleccion.delay()`.
 
 La app también puede lanzar el screener sola: si pedís la selección y no hay una vigente, la calcula en un hilo en segundo plano.
 
@@ -268,10 +270,10 @@ Todas usan la hora de Buenos Aires y corren de lunes a viernes salvo que se indi
 
 | Tarea | Horario | Qué hace |
 |---|---|---|
-| `landgraft.tasks.ingestar_precios` | 18:30 | Guarda el precio del día de BYMA |
-| `landgraft.tasks.ingestar_indicadores` | 18:35 (todos los días) | Actualiza MEP, CCL, riesgo país, UVA, inflación y plazo fijo |
-| `landgraft.tasks.calcular_seleccion` | 10:00 y 16:00 | Recalcula el screener |
-| `landgraft.tasks.preparar_medicion` | 18:45 | Baja la historia del Merval y de los elegidos que aún no la tienen |
+| `quorum.tasks.ingestar_precios` | 18:30 | Guarda el precio del día de BYMA |
+| `quorum.tasks.ingestar_indicadores` | 18:35 (todos los días) | Actualiza MEP, CCL, riesgo país, UVA, inflación y plazo fijo |
+| `quorum.tasks.calcular_seleccion` | 10:00 y 16:00 | Recalcula el screener |
+| `quorum.tasks.preparar_medicion` | 18:45 | Baja la historia del Merval y de los elegidos que aún no la tienen |
 | `analysisActions.tasks.actualizar_cedears_task` | Cada 20 min, 11–17 h | Actualiza los CEDEAR |
 | `cartera.tasks.registrar_snapshots` | 18:00 | Guarda el valor diario de cada cartera |
 | `cartera.tasks.generar_informes` | 18:15 diario · día 1 mensual · 1 de enero anual | Informes de la cartera |
@@ -280,7 +282,7 @@ Todas usan la hora de Buenos Aires y corren de lunes a viernes salvo que se indi
 
 ## API
 
-Todas las rutas empiezan con `/landgraft/api/`. Las respuestas son JSON.
+Todas las rutas empiezan con `/quorum/api/`. Las respuestas son JSON.
 
 | Ruta | Método | Descripción | Sesión |
 |---|---|---|---|
@@ -300,7 +302,7 @@ Las escrituras a `datos/` exigen el token CSRF de `sesion/` en el encabezado `X-
 ## Pruebas
 
 ```bash
-python manage.py test landgraft
+python manage.py test quorum
 ```
 
 Son 24 pruebas: API de datos y de sesión, cálculo de TIR y cupón corrido, cronograma del GD30, liquidación de 24 horas, riesgo en USD, beta, estrategia y medición. Las pruebas no llaman a internet: usan datos fabricados.
@@ -308,8 +310,8 @@ Son 24 pruebas: API de datos y de sesión, cálculo de TIR y cupón corrido, cro
 Para el código de la interfaz:
 
 ```bash
-node --check landgraft/static/landgraft/funciones.js
-node --check landgraft/static/landgraft/front.js
+node --check quorum/static/quorum/funciones.js
+node --check quorum/static/quorum/front.js
 ```
 
 Verificación del sistema:
@@ -323,9 +325,9 @@ python manage.py check
 ## Estructura del repositorio
 
 ```
-tradingMarket/
-├── trading/                  Configuración del proyecto: settings, urls, celery
-├── landgraft/                Comité, screener, riesgo, estrategia y medición
+quorum/
+├── config/                  Configuración del proyecto: settings, urls, celery
+├── quorum/                Comité, screener, riesgo, estrategia y medición
 │   ├── byma.py               BYMA: precios, fichas técnicas, TIR y CER
 │   ├── yahoo.py              Yahoo Finance: analistas, precio objetivo, volatilidad
 │   ├── seleccion.py          Screener de acciones, CEDEAR, bonos, letras y ON
@@ -338,7 +340,7 @@ tradingMarket/
 │   ├── tasks.py              Tareas de Celery
 │   ├── models.py             Documento, PrecioDiario, Indicador, SeleccionHistorica
 │   ├── management/commands/  cargar_historia
-│   ├── static/landgraft/     Interfaz: funciones.js (cálculo), front.js (pantalla)
+│   ├── static/quorum/     Interfaz: funciones.js (cálculo), front.js (pantalla)
 │   └── test_*.py, tests.py   Pruebas
 ├── cartera/                  Snapshots diarios e informes (con Claude opcional)
 ├── analysisActions/          Análisis de acciones y actualización de CEDEAR
@@ -358,16 +360,16 @@ tradingMarket/
 Creá `.env` a partir de `.env.example` y generá la clave con el comando de la sección de instalación. Si estás en desarrollo, `DJANGO_DEBUG=1` permite arrancar sin clave.
 
 **El screener muestra "calculando" y nunca termina**
-Revisá el terminal del worker de Celery. Si no hay worker, el cálculo se lanza en un hilo y puede tardar varios minutos (cientos de especies, consultas a Yahoo). El progreso aparece en `/landgraft/api/seleccion/`.
+Revisá el terminal del worker de Celery. Si no hay worker, el cálculo se lanza en un hilo y puede tardar varios minutos (cientos de especies, consultas a Yahoo). El progreso aparece en `/quorum/api/seleccion/`.
 
 **BYMA muestra precios en cero**
-Es normal antes de la apertura del mercado. Landgraft usa el último respaldo guardado y lo marca como desactualizado en la respuesta.
+Es normal antes de la apertura del mercado. Quórum usa el último respaldo guardado y lo marca como desactualizado en la respuesta.
 
 **"No hay historia del MEP en la base"**
 Corré `python manage.py cargar_historia`. El riesgo y la medición necesitan los indicadores.
 
 **Yahoo Finance devuelve errores o "Too Many Requests"**
-Es un límite de pedidos. Landgraft guarda el error solo cinco minutos y sigue con el resto. Si persiste, esperá un rato y volvé a cargar.
+Es un límite de pedidos. Quórum guarda el error solo cinco minutos y sigue con el resto. Si persiste, esperá un rato y volvé a cargar.
 
 **Windows: el worker de Celery no arranca o se cae**
 Usá `--pool=solo`, que es el pool que funciona en Windows (ver la sección de puesta en marcha).
@@ -384,10 +386,10 @@ Usá Python 3.12, con el que se probó el proyecto. Las versiones fijadas en `re
 - **El criterio de analistas no se puede backtestear.** Yahoo solo da el precio objetivo actual, no su historia. La medición hacia adelante es el único método honesto para esa parte.
 - **Renta fija en dólares.** Su riesgo se aproxima con el riesgo país y la duration, no con el precio de mercado de cada bono.
 - **Ganancias fiscales.** La estimación de AI Fiscal es orientativa. No reemplaza al contador.
-- **Sin ejecución.** Landgraft no compra ni vende. Las órdenes se ejecutan en tu broker.
+- **Sin ejecución.** Quórum no compra ni vende. Las órdenes se ejecutan en tu broker.
 
 ---
 
 ## Licencia
 
-**Pendiente.** El repositorio todavía no tiene un archivo `LICENSE`. Hasta que se agregue, el código no tiene una licencia de uso explícita.
+Este proyecto se distribuye bajo la [licencia MIT](LICENSE).

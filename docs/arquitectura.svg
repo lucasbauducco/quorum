@@ -5,7 +5,7 @@
     </marker>
   </defs>
   <rect width="1206" height="640" fill="#ffffff"/>
-  <text x="603" y="40" text-anchor="middle" font-size="22" font-weight="700" fill="#1d2733">Landgraft · arquitectura</text>
+  <text x="603" y="40" text-anchor="middle" font-size="22" font-weight="700" fill="#1d2733">Quórum · arquitectura</text>
   <text x="603" y="62" text-anchor="middle" font-size="13" fill="#5b6675">Datos públicos → ingesta programada → base y motores de cálculo → comité en el navegador</text>
 
   <!-- Columnas de cabecera -->
@@ -115,7 +115,7 @@
   <!-- Interfaz -->
   <rect x="330" y="500" width="852" height="112" rx="12" fill="#fdebec" stroke="#b5484e" stroke-width="1.5"/>
   <g fill="#1d2733">
-    <text x="348" y="530" font-size="16" font-weight="700">Interfaz web /landgraft/ · comité de 14 agentes</text>
+    <text x="348" y="530" font-size="16" font-weight="700">Interfaz web /quorum/ · comité de 14 agentes</text>
     <text x="348" y="552" font-size="12" fill="#3b4656">Mi cartera · Recomendaciones · Evaluar · Lista · Decisiones · Informes · Escenarios</text>
     <text x="348" y="570" font-size="12" fill="#3b4656">Riesgo · Estrategia · Rebalanceo · Consultar · Comité · Fuentes · Ajustes</text>
     <text x="348" y="594" font-size="12" font-weight="700" fill="#7a2a2f">API: mercado · analisis · seleccion · riesgo · estrategia · medicion · datos (datos: requiere sesión)</text>
