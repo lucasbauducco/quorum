@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 UNIVERSO = {'accion': 30, 'cedear': 40, 'bono': 60, 'letra': 60, 'on': 60}
 # Por tipo: (mínimo de analistas, peor caída de 6 meses aceptada, techo de la suba esperada)
 FILTROS = {'accion': (3, -0.35, 0.80), 'cedear': (10, -0.30, 0.60)}
+HAIRCUT_OBJETIVO = 0.5
 CONSENSO = {'strong_buy': 0.05, 'buy': 0.03, 'hold': 0, 'underperform': -0.05, 'sell': -0.08, 'strong_sell': -0.1}
 NOMBRE_CONSENSO = {'strong_buy': 'compra fuerte', 'buy': 'compra', 'hold': 'mantener', 'underperform': 'bajo rendimiento', 'sell': 'venta', 'strong_sell': 'venta fuerte'}
 
@@ -86,14 +87,21 @@ def _renta_variable(cotizaciones, tipo):
         if d.get('var6m') is not None and d['var6m'] < peor_caida:
             continue
         confianza = min(d['analistas'], 20) / 20
-        tendencia = max(-0.3, min(0.3, d.get('var6m') or 0)) * 0.3
-        puntaje = min(d['upside'], techo) * (0.5 + 0.5 * confianza) + CONSENSO.get(d.get('consenso'), 0) + tendencia
+        # Momentum 12-1 si hay un año de historia; si no, 6 meses.
+        momentum = d.get('momentum12_1') if d.get('momentum12_1') is not None else (d.get('var6m') or 0)
+        tendencia = max(-0.3, min(0.3, momentum)) * 0.3
+        # Los precios objetivo de los analistas son optimistas: se recortan a la mitad y se dividen por la
+        # volatilidad, para premiar la suba esperada por unidad de riesgo y no la suba a secas.
+        volatilidad = max(d.get('volatilidad') or 0.35, 0.15)
+        puntaje = (min(d['upside'], techo) * HAIRCUT_OBJETIVO / volatilidad) * (0.5 + 0.5 * confianza) + CONSENSO.get(d.get('consenso'), 0) + tendencia
         elegidos.append({
             'simbolo': simbolo, 'tipo': tipo, 'precio': c['precio'], 'cantidad': _cantidad(c['precio'], tipo),
             'puntaje': round(puntaje, 4),
             'proyeccion': 'Precio objetivo ' + _pct(d['upside']) + ' a 12 meses según ' + str(d['analistas'])
                           + ' analistas (' + NOMBRE_CONSENSO.get(d.get('consenso'), 'sin consenso') + ', '
-                          + d['tickerAnalistas'] + ')' + ('; 6 meses ' + _pct(d['var6m']) if d.get('var6m') is not None else ''),
+                          + d['tickerAnalistas'] + ')' + ('; 6 meses ' + _pct(d['var6m']) if d.get('var6m') is not None else '')
+                          + ('; volatilidad ' + _pct(d['volatilidad']).lstrip('+') if d.get('volatilidad') else ''),
+            'volatilidad': d.get('volatilidad'), 'sector': d.get('sector'),
             'fuente': 'BYMA y Yahoo Finance',
         })
     return sorted(elegidos, key=lambda x: -x['puntaje'])[:POR_TIPO]

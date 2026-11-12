@@ -18,3 +18,4 @@ class Command(BaseCommand):
         self.stdout.write('Historia de Yahoo Finance: %s especies, %s cierres' % (len(resultado), sum(resultado.values())))
         criptos = historia.backfill_criptos(dias)
         self.stdout.write('Historia de criptos: %s' % criptos)
+        self.stdout.write('Historia del Merval (referencia de la medición y del beta): %s cierres' % historia.ingestar_indice())

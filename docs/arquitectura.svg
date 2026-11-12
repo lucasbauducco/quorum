@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1206 640" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="flecha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4a5563"/>
+    </marker>
+  </defs>
+  <rect width="1206" height="640" fill="#ffffff"/>
+  <text x="603" y="40" text-anchor="middle" font-size="22" font-weight="700" fill="#1d2733">Landgraft · arquitectura</text>
+  <text x="603" y="62" text-anchor="middle" font-size="13" fill="#5b6675">Datos públicos → ingesta programada → base y motores de cálculo → comité en el navegador</text>
+
+  <!-- Columnas de cabecera -->
+  <g font-size="12" font-weight="700" fill="#5b6675" letter-spacing="1">
+    <text x="24" y="98">FUENTES PÚBLICAS</text>
+    <text x="330" y="98">INGESTA (CELERY BEAT)</text>
+    <text x="636" y="98">BASE DE DATOS</text>
+    <text x="942" y="98">MOTORES DE CÁLCULO</text>
+  </g>
+
+  <!-- Columna 1: fuentes -->
+  <g stroke="#3b6ea8" stroke-width="1.5" fill="#e8f1fb">
+    <rect x="24" y="115" width="240" height="58" rx="10"/>
+    <rect x="24" y="187" width="240" height="58" rx="10"/>
+    <rect x="24" y="259" width="240" height="58" rx="10"/>
+    <rect x="24" y="331" width="240" height="58" rx="10"/>
+    <rect x="24" y="403" width="240" height="58" rx="10"/>
+  </g>
+  <g fill="#1d2733">
+    <text x="38" y="139" font-size="15" font-weight="700">BYMA</text>
+    <text x="38" y="158" font-size="12" fill="#3b4656">Precios del día, fichas técnicas</text>
+    <text x="38" y="211" font-size="15" font-weight="700">Yahoo Finance</text>
+    <text x="38" y="230" font-size="12" fill="#3b4656">Historia, analistas, Merval</text>
+    <text x="38" y="283" font-size="15" font-weight="700">ArgentinaDatos</text>
+    <text x="38" y="302" font-size="12" fill="#3b4656">MEP, CCL, riesgo país, UVA, LECAP</text>
+    <text x="38" y="355" font-size="15" font-weight="700">CoinGecko</text>
+    <text x="38" y="374" font-size="12" fill="#3b4656">Precio de criptomonedas</text>
+    <text x="38" y="427" font-size="15" font-weight="700">DolarAPI</text>
+    <text x="38" y="446" font-size="12" fill="#3b4656">Dólar oficial y MEP al día</text>
+  </g>
+
+  <!-- Columna 2: ingesta -->
+  <g stroke="#c7822b" stroke-width="1.5" fill="#fff4e0">
+    <rect x="330" y="115" width="240" height="58" rx="10"/>
+    <rect x="330" y="187" width="240" height="58" rx="10"/>
+    <rect x="330" y="259" width="240" height="58" rx="10"/>
+    <rect x="330" y="331" width="240" height="58" rx="10"/>
+    <rect x="330" y="403" width="240" height="58" rx="10"/>
+  </g>
+  <g fill="#1d2733">
+    <text x="344" y="139" font-size="15" font-weight="700">Ingesta de precios</text>
+    <text x="344" y="158" font-size="12" fill="#3b4656">L–V 18:30 · precios de BYMA</text>
+    <text x="344" y="211" font-size="15" font-weight="700">Ingesta de indicadores</text>
+    <text x="344" y="230" font-size="12" fill="#3b4656">Diario 18:35 · MEP, riesgo país</text>
+    <text x="344" y="283" font-size="15" font-weight="700">Screener</text>
+    <text x="344" y="302" font-size="12" fill="#3b4656">L–V 10:00 y 16:00 · top 10</text>
+    <text x="344" y="355" font-size="15" font-weight="700">Medición de selecciones</text>
+    <text x="344" y="374" font-size="12" fill="#3b4656">L–V 18:45 · Merval y elegidos</text>
+    <text x="344" y="427" font-size="15" font-weight="700">Historia completa</text>
+    <text x="344" y="446" font-size="12" fill="#3b4656">Manual: cargar_historia</text>
+  </g>
+
+  <!-- Columna 3: base de datos -->
+  <rect x="636" y="115" width="240" height="325" rx="10" fill="#eaf7ee" stroke="#2e8b57" stroke-width="1.5"/>
+  <g fill="#1d2733">
+    <text x="650" y="142" font-size="15" font-weight="700">SQLite · db.sqlite3</text>
+    <text x="650" y="200" font-size="13" font-weight="700">PrecioDiario</text>
+    <text x="650" y="216" font-size="12" fill="#3b4656">cierres diarios por fuente</text>
+    <text x="650" y="240" font-size="13" font-weight="700">Indicador</text>
+    <text x="650" y="256" font-size="12" fill="#3b4656">MEP, CCL, riesgo país, UVA</text>
+    <text x="650" y="280" font-size="13" font-weight="700">SeleccionHistorica</text>
+    <text x="650" y="296" font-size="12" fill="#3b4656">cada corrida del screener</text>
+    <text x="650" y="320" font-size="13" font-weight="700">Documento</text>
+    <text x="650" y="336" font-size="12" fill="#3b4656">carteras, decisiones, ajustes</text>
+    <text x="650" y="360" font-size="13" font-weight="700">cartera (app aparte)</text>
+    <text x="650" y="376" font-size="12" fill="#3b4656">snapshots e informes</text>
+  </g>
+  <rect x="650" y="390" width="212" height="40" rx="8" fill="#ffffff" stroke="#2e8b57" stroke-dasharray="4 3"/>
+  <text x="756" y="408" text-anchor="middle" font-size="12" font-weight="700" fill="#1d2733">Caché</text>
+  <text x="756" y="422" text-anchor="middle" font-size="11" fill="#3b4656">memoria local o Redis</text>
+
+  <!-- Columna 4: motores -->
+  <g stroke="#7b4bb3" stroke-width="1.5" fill="#f3ecfb">
+    <rect x="942" y="115" width="240" height="58" rx="10"/>
+    <rect x="942" y="187" width="240" height="58" rx="10"/>
+    <rect x="942" y="259" width="240" height="58" rx="10"/>
+    <rect x="942" y="331" width="240" height="58" rx="10"/>
+    <rect x="942" y="403" width="240" height="58" rx="10"/>
+  </g>
+  <g fill="#1d2733">
+    <text x="956" y="139" font-size="15" font-weight="700">Screener</text>
+    <text x="956" y="158" font-size="12" fill="#3b4656">Top 10 por tipo y riesgo</text>
+    <text x="956" y="211" font-size="15" font-weight="700">Riesgo en USD</text>
+    <text x="956" y="230" font-size="12" fill="#3b4656">Volatilidad, VaR, beta, Sharpe</text>
+    <text x="956" y="283" font-size="15" font-weight="700">Estrategia</text>
+    <text x="956" y="302" font-size="12" fill="#3b4656">Carry, devaluación, breakeven</text>
+    <text x="956" y="355" font-size="15" font-weight="700">Medición</text>
+    <text x="956" y="374" font-size="12" fill="#3b4656">Alfa vs Merval en USD, 30/90/180</text>
+    <text x="956" y="427" font-size="15" font-weight="700">Bonos y TIR</text>
+    <text x="956" y="446" font-size="12" fill="#3b4656">Ficha BYMA, duration, curva</text>
+  </g>
+
+  <!-- Flechas entre columnas -->
+  <g stroke="#4a5563" stroke-width="2" fill="none" marker-end="url(#flecha)">
+    <line x1="266" y1="288" x2="328" y2="288"/>
+    <line x1="572" y1="288" x2="634" y2="288"/>
+    <line x1="878" y1="288" x2="940" y2="288"/>
+    <line x1="1062" y1="461" x2="1062" y2="498" stroke-dasharray="0"/>
+    <line x1="756" y1="430" x2="756" y2="498" stroke-dasharray="6 5"/>
+  </g>
+  <g font-size="11" fill="#5b6675" text-anchor="middle">
+    <text x="297" y="280">descarga</text>
+    <text x="603" y="280">guarda</text>
+    <text x="909" y="280">calcula</text>
+  </g>
+
+  <!-- Interfaz -->
+  <rect x="330" y="500" width="852" height="112" rx="12" fill="#fdebec" stroke="#b5484e" stroke-width="1.5"/>
+  <g fill="#1d2733">
+    <text x="348" y="530" font-size="16" font-weight="700">Interfaz web /landgraft/ · comité de 14 agentes</text>
+    <text x="348" y="552" font-size="12" fill="#3b4656">Mi cartera · Recomendaciones · Evaluar · Lista · Decisiones · Informes · Escenarios</text>
+    <text x="348" y="570" font-size="12" fill="#3b4656">Riesgo · Estrategia · Rebalanceo · Consultar · Comité · Fuentes · Ajustes</text>
+    <text x="348" y="594" font-size="12" font-weight="700" fill="#7a2a2f">API: mercado · analisis · seleccion · riesgo · estrategia · medicion · datos (datos: requiere sesión)</text>
+  </g>
+  <text x="1062" y="490" text-anchor="middle" font-size="11" fill="#5b6675">sirve</text>
+</svg>

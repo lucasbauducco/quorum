@@ -24,22 +24,70 @@
     cripto: 'Criptomonedas'
   };
 
-  // Límites y asignación objetivo por perfil. Todo en fracción: 0.20 = 20 %.
+  // Límites y asignación objetivo por perfil o estrategia. Todo en fracción: 0.20 = 20 %.
+  // sector: máximo por sector; contribRiesgo: máximo aporte de una posición al riesgo de la cartera;
+  // banda: tolerancia del rebalanceo, en puntos porcentuales absolutos.
+  function limitesDe(base, cambios) {
+    var o = {};
+    Object.keys(base).forEach(function (k) { o[k] = base[k]; });
+    Object.keys(cambios || {}).forEach(function (k) { o[k] = cambios[k]; });
+    return o;
+  }
+
+  var LIMITES_MODERADO = {
+    emisor: 0.20, soberana: 0.35, liquidezMin: 0.05, gananciaReducir: 0.25, pesoReducir: 0.10, perdidaRevisar: -0.15,
+    recorte: 0.15, perdidaEscenario: 0.03, comision: 0.006, sector: 0.40, contribRiesgo: 0.25, banda: 0.05
+  };
+
   var PERFILES = {
     conservador: {
       nombre: 'Conservador',
-      limites: { emisor: 0.10, soberana: 0.50, liquidezMin: 0.10, gananciaReducir: 0.15, pesoReducir: 0.06, perdidaRevisar: -0.08, recorte: 0.20, perdidaEscenario: 0.02, comision: 0.006 },
+      descripcion: 'Prioriza no perder: mucha renta fija y liquidez, poca renta variable y nada de cripto.',
+      riesgos: 'Puede quedar atrás de la inflación y del dólar si el mercado sube mucho.',
+      limites: limitesDe(LIMITES_MODERADO, { emisor: 0.10, soberana: 0.50, liquidezMin: 0.10, gananciaReducir: 0.15, pesoReducir: 0.06, perdidaRevisar: -0.08, recorte: 0.20, perdidaEscenario: 0.02, sector: 0.30, contribRiesgo: 0.20, banda: 0.04 }),
       objetivo: { variable: 0.15, soberana: 0.45, privada: 0.15, liquidez: 0.25, cripto: 0 }
     },
     moderado: {
       nombre: 'Moderado',
-      limites: { emisor: 0.20, soberana: 0.35, liquidezMin: 0.05, gananciaReducir: 0.25, pesoReducir: 0.10, perdidaRevisar: -0.15, recorte: 0.15, perdidaEscenario: 0.03, comision: 0.006 },
+      descripcion: 'Equilibrio entre crecimiento y estabilidad: renta variable como motor, renta fija como base.',
+      riesgos: 'Pierde valor en una crisis cambiaria o una caída fuerte de las acciones.',
+      limites: limitesDe(LIMITES_MODERADO, {}),
       objetivo: { variable: 0.35, soberana: 0.30, privada: 0.15, liquidez: 0.15, cripto: 0.05 }
     },
     agresivo: {
       nombre: 'Agresivo',
-      limites: { emisor: 0.30, soberana: 0.25, liquidezMin: 0.03, gananciaReducir: 0.40, pesoReducir: 0.15, perdidaRevisar: -0.25, recorte: 0.10, perdidaEscenario: 0.06, comision: 0.006 },
+      descripcion: 'Busca crecer: mayoría en renta variable y algo de cripto, con poca liquidez.',
+      riesgos: 'Caídas de 30 % o más en períodos cortos; exige tolerar la volatilidad.',
+      limites: limitesDe(LIMITES_MODERADO, { emisor: 0.30, soberana: 0.25, liquidezMin: 0.03, gananciaReducir: 0.40, pesoReducir: 0.15, perdidaRevisar: -0.25, recorte: 0.10, perdidaEscenario: 0.06, sector: 0.50, contribRiesgo: 0.35, banda: 0.07 }),
       objetivo: { variable: 0.55, soberana: 0.15, privada: 0.10, liquidez: 0.10, cripto: 0.10 }
+    },
+    carry_pesos: {
+      nombre: 'Carry en pesos',
+      descripcion: 'Vive de la tasa en pesos: letras y bonos a tasa fija, con liquidez para reinvertir. Conviene cuando la tasa supera lo que se espera que suba el dólar (ver Pesos contra dólar).',
+      riesgos: 'Un salto del dólar mayor al que descuenta la tasa borra la ganancia. Se pierde contra la inflación si la tasa real es negativa.',
+      limites: limitesDe(LIMITES_MODERADO, { soberana: 0.60, liquidezMin: 0.10, emisor: 0.15, sector: 0.35, contribRiesgo: 0.30, banda: 0.05 }),
+      objetivo: { variable: 0.10, soberana: 0.55, privada: 0.10, liquidez: 0.25, cripto: 0 }
+    },
+    dolarizacion: {
+      nombre: 'Dolarización',
+      descripcion: 'Protege el poder de compra en dólares: CEDEAR, ON en dólares y soberanos hard dollar, con caja en dólares.',
+      riesgos: 'Renuncia a la tasa en pesos si el dólar queda quieto; las ON y los bonos dependen del riesgo país.',
+      limites: limitesDe(LIMITES_MODERADO, { soberana: 0.25, liquidezMin: 0.10, emisor: 0.15, sector: 0.40, contribRiesgo: 0.25, banda: 0.05 }),
+      objetivo: { variable: 0.35, soberana: 0.20, privada: 0.30, liquidez: 0.15, cripto: 0 }
+    },
+    renta_usd: {
+      nombre: 'Renta en dólares',
+      descripcion: 'Busca ingresos en dólares: sobre todo ON y bonos en dólares, con poca renta variable.',
+      riesgos: 'Riesgo de crédito de las empresas y del soberano; el precio cae si sube el riesgo país.',
+      limites: limitesDe(LIMITES_MODERADO, { soberana: 0.30, liquidezMin: 0.08, emisor: 0.12, sector: 0.30, contribRiesgo: 0.25, banda: 0.05 }),
+      objetivo: { variable: 0.10, soberana: 0.25, privada: 0.55, liquidez: 0.10, cripto: 0 }
+    },
+    crecimiento: {
+      nombre: 'Crecimiento',
+      descripcion: 'Apunta a la mayor suba a largo plazo: renta variable y cripto, con una base de renta fija.',
+      riesgos: 'Volatilidad alta: tolera caídas profundas. No es para plazos cortos.',
+      limites: limitesDe(LIMITES_MODERADO, { emisor: 0.25, soberana: 0.20, liquidezMin: 0.05, gananciaReducir: 0.40, pesoReducir: 0.15, perdidaRevisar: -0.20, perdidaEscenario: 0.05, sector: 0.45, contribRiesgo: 0.30, banda: 0.07 }),
+      objetivo: { variable: 0.60, soberana: 0.10, privada: 0.10, liquidez: 0.10, cripto: 0.10 }
     }
   };
 
@@ -61,11 +109,13 @@
     { id: 'memoria',    nombre: 'AI Memoria',    rol: 'Registra cada decisión y la mide a 30, 90 y 365 días.', motor: 'Código' }
   ];
 
+  // spread: suba del riesgo país en fracción (0.04 = 400 puntos básicos); afecta a los bonos y ON en dólares por su duration.
   var ESCENARIOS = [
-    { id: 'devaluacion', nombre: 'Devaluación',      descripcion: 'El dólar MEP sube 30 %',                     mep: 0.30, tasas: 0,    merval: 0,     cedear: 0.30 },
-    { id: 'tasas',       nombre: 'Suba de tasas',    descripcion: 'Las tasas suben 10 puntos',                  mep: 0,    tasas: 0.10, merval: -0.05, cedear: 0 },
-    { id: 'merval',      nombre: 'Caída del Merval', descripcion: 'Las acciones locales caen 25 %',             mep: 0,    tasas: 0,    merval: -0.25, cedear: -0.05 },
-    { id: 'crisis',      nombre: 'Crisis combinada', descripcion: 'Devaluación, suba de tasas y Merval en baja', mep: 0.30, tasas: 0.10, merval: -0.25, cedear: 0.25 }
+    { id: 'devaluacion', nombre: 'Devaluación',          descripcion: 'El dólar MEP sube 30 %',                          mep: 0.30, tasas: 0,    merval: 0,     cedear: 0.30, spread: 0 },
+    { id: 'tasas',       nombre: 'Suba de tasas',        descripcion: 'Las tasas en pesos suben 10 puntos',              mep: 0,    tasas: 0.10, merval: -0.05, cedear: 0,    spread: 0 },
+    { id: 'merval',      nombre: 'Caída del Merval',     descripcion: 'Las acciones locales caen 25 %',                  mep: 0,    tasas: 0,    merval: -0.25, cedear: -0.05, spread: 0 },
+    { id: 'riesgo_pais', nombre: 'Salto del riesgo país', descripcion: 'El riesgo país sube 400 puntos y el MEP 10 %',   mep: 0.10, tasas: 0.05, merval: -0.15, cedear: 0.10, spread: 0.04 },
+    { id: 'crisis',      nombre: 'Crisis combinada',     descripcion: 'Devaluación, suba de tasas, riesgo país y Merval', mep: 0.30, tasas: 0.10, merval: -0.25, cedear: 0.25, spread: 0.06 }
   ];
 
   var MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -145,7 +195,7 @@
       grupo: info.grupo,
       moneda: t.moneda || ins.moneda || 'ARS',
       emisor: t.emisor || ins.emisor || t.simbolo,
-      sector: ins.sector || 'Sin dato',
+      sector: t.sector || ins.sector || 'Sin dato',
       cantidad: t.cantidad,
       costo: t.costo == null ? null : t.costo,
       precio: precio,
@@ -174,7 +224,7 @@
       grupo: info.grupo,
       moneda: t.moneda || 'ARS',
       emisor: t.emisor || t.simbolo,
-      sector: 'Sin dato',
+      sector: t.sector || 'Sin dato',
       cantidad: 1,
       costo: null,
       precio: t.valorDirecto,
@@ -223,7 +273,7 @@
   function factorEscenario(p, esc) {
     var precio = 0;
     if (p.grupo === 'variable') precio = p.tipo === 'cedear' ? esc.cedear : esc.merval;
-    else if (p.duration) precio = -p.duration * esc.tasas;
+    else if (p.duration) precio = -p.duration * ((p.moneda === 'USD' || p.rendEnUsd) ? (esc.spread || 0) : esc.tasas);
     return p.moneda === 'USD' ? (1 + esc.mep) * (1 + precio) - 1 : precio;
   }
 
@@ -256,7 +306,7 @@
   var VEREDICTO = {
     comprar: 'Comprar', comprar_parcial: 'Comprar', comprar_mas: 'Comprar', no_comprar: 'No comprar',
     vender: 'Vender', vender_todo: 'Vender', reducir: 'Vender', reducir_limite: 'Vender', reducir_grupo: 'Vender',
-    rotar: 'Vender', revisar: 'Vender', reinvertir: 'Mantener', mantener: 'Mantener', sin_datos: 'Mantener'
+    reducir_sector: 'Vender', reducir_riesgo: 'Vender', rotar: 'Vender', revisar: 'Vender', reinvertir: 'Mantener', mantener: 'Mantener', sin_datos: 'Mantener'
   };
 
   // AI Acciones: suma señales de fuentes externas (analistas, precio objetivo, tendencia) y de tu resultado.
@@ -410,21 +460,40 @@
       paso('liquidez', 'Liquidez en ' + pct(liquidezPost) + '.', 'ok');
     }
 
-    // AI Guardián
+    // AI Guardián: emisor, sector y aporte al riesgo de la cartera
     var excesoEmisor = concentrable(pos.grupo) && emisorPost > L.emisor;
-    if (excesoEmisor) {
-      var ge = 'El emisor pasaría a ' + pct(emisorPost) + ', por encima del límite de ' + pct(L.emisor) + '.';
-      if (esCompra) {
-        paso('guardian', ge, 'veto');
-        vetos.push({ quien: 'AI Guardián', motivo: ge });
-      } else {
-        ge = 'El emisor pesa ' + pct(emisorPost) + ', por encima del límite de ' + pct(L.emisor) + '.';
-        paso('guardian', ge, 'alerta');
-        motivos.push(ge);
-      }
-    } else {
-      paso('guardian', concentrable(pos.grupo) ? 'Emisor en ' + pct(emisorPost) + ', dentro del límite.' : 'Sin límite por emisor para este tipo.', 'ok');
+    var limiteSector = L.sector || 0.40;
+    var conSector = !!(pos.sector && pos.sector !== 'Sin dato' && concentrable(pos.grupo));
+    var sectorActual = conSector
+      ? suma(cartera.filter(function (p) { return concentrable(p.grupo) && p.sector === pos.sector; }), valorARS) : 0;
+    var sectorPost = totPost ? (sectorActual + valorNuevo) / totPost : 0;
+    var excesoSector = conSector && sectorPost > limiteSector;
+    var infoRiesgo = (ctx.riesgo || {})[pos.simbolo];
+    var capRiesgo = L.contribRiesgo || 0.25;
+    var excesoRiesgo = !esCompra && !!infoRiesgo && infoRiesgo.contribucionRiesgo > capRiesgo;
+    var partesGuardian = [];
+    var votoGuardian = 'ok';
+    function avisoGuardian(texto) {
+      partesGuardian.push(texto);
+      if (esCompra) { vetos.push({ quien: 'AI Guardián', motivo: texto }); votoGuardian = 'veto'; }
+      else { motivos.push(texto); if (votoGuardian !== 'veto') votoGuardian = 'alerta'; }
     }
+    if (excesoEmisor) {
+      avisoGuardian((esCompra ? 'El emisor pasaría a ' : 'El emisor pesa ') + pct(emisorPost) + ', por encima del límite de ' + pct(L.emisor) + '.');
+    }
+    if (excesoSector) {
+      avisoGuardian('El sector ' + pos.sector + (esCompra ? ' pasaría a ' : ' pesa ') + pct(sectorPost) + ', por encima del límite de ' + pct(limiteSector) + '.');
+    }
+    if (excesoRiesgo) {
+      partesGuardian.push('Aporta ' + pct(infoRiesgo.contribucionRiesgo) + ' del riesgo de la cartera (volatilidad ' + pct(infoRiesgo.volatilidad) + '), por encima del límite de ' + pct(capRiesgo) + '.');
+      motivos.push(partesGuardian[partesGuardian.length - 1]);
+      if (votoGuardian !== 'veto') votoGuardian = 'alerta';
+    }
+    if (!partesGuardian.length) {
+      partesGuardian.push((concentrable(pos.grupo) ? 'Emisor en ' + pct(emisorPost) + ', dentro del límite' : 'Sin límite por emisor para este tipo') +
+        (infoRiesgo ? '; aporta ' + pct(infoRiesgo.contribucionRiesgo) + ' del riesgo de la cartera' : '') + '.');
+    }
+    paso('guardian', partesGuardian.join(' '), votoGuardian);
 
     // AI Escenarios
     var base = esCompra ? valorNuevo : pos.valorARS;
@@ -489,6 +558,7 @@
       if (vetos.length && sug.accion === 'comprar') {
         var techo = Infinity;
         if (concentrable(pos.grupo)) techo = Math.min(techo, (L.emisor * tot - emisorActual) / (1 - L.emisor));
+        if (excesoSector) techo = Math.min(techo, (limiteSector * tot - sectorActual) / (1 - limiteSector));
         if (pos.grupo === 'soberana') techo = Math.min(techo, (L.soberana * tot - grupoActual) / (1 - L.soberana));
         var maxCant = isFinite(techo) && valorUnitario ? Math.max(0, Math.floor(techo / valorUnitario)) : 0;
         paso('tamano', maxCant ? 'Tamaño máximo: ' + miles(maxCant) + ' unidades.' : 'Ninguna cantidad entra en los límites.', maxCant ? 'alerta' : 'veto');
@@ -515,6 +585,13 @@
         .sort(function (a, b) { return b.valorARS - a.valorARS; });
       if (acc === 'mantener' && excesoEmisor) acc = 'reducir_limite';
       else if (acc === 'mantener' && excesoGrupo && soberanas.length && soberanas[0].simbolo === pos.simbolo) acc = 'reducir_grupo';
+      else if (acc === 'mantener' && excesoSector && cartera.filter(function (p) { return concentrable(p.grupo) && p.sector === pos.sector; })
+        .sort(function (x, y) { return y.valorARS - x.valorARS; })[0].simbolo === pos.simbolo) acc = 'reducir_sector';
+      else if (acc === 'mantener' && excesoRiesgo) acc = 'reducir_riesgo';
+      if (acc === 'comprar_mas' && (excesoSector || excesoRiesgo)) {
+        acc = 'mantener';
+        motivos.push('El comité compraría más, pero ' + (excesoSector ? 'el sector ' + pos.sector + ' ya supera su límite.' : 'la posición ya aporta demasiado al riesgo de la cartera.'));
+      }
       if (acc === 'comprar_mas' && concentrable(pos.grupo) && emisorPost > L.emisor * 0.9) {
         acc = 'mantener';
         motivos.push('El comité compraría más, pero el emisor ya pesa ' + pct(emisorPost) + ' y el límite es ' + pct(L.emisor) + '.');
@@ -547,6 +624,14 @@
       } else if (acc === 'reducir_grupo') {
         res.decision = 'Reducir hasta el límite de renta fija';
         res.cantidad = Math.min(pos.cantidad, Math.ceil((grupoActual - L.soberana * tot) / (1 - L.soberana) / valorUnitario));
+        res.nivel = 'warn';
+      } else if (acc === 'reducir_sector') {
+        res.decision = 'Reducir por concentración en ' + pos.sector;
+        res.cantidad = Math.min(pos.cantidad, Math.ceil((sectorActual - limiteSector * tot) / (1 - limiteSector) / valorUnitario));
+        res.nivel = 'warn';
+      } else if (acc === 'reducir_riesgo') {
+        res.decision = 'Reducir por aporte al riesgo';
+        res.cantidad = parte(pos.cantidad * L.recorte);
         res.nivel = 'warn';
       } else if (acc === 'revisar') {
         res.decision = 'Revisar tesis';
@@ -582,7 +667,7 @@
   }
 
   function accionable(r) {
-    return ['reducir', 'reducir_limite', 'reducir_grupo', 'rotar', 'reinvertir', 'comprar', 'comprar_parcial', 'comprar_mas', 'vender', 'vender_todo'].indexOf(r.accion) >= 0;
+    return ['reducir', 'reducir_limite', 'reducir_grupo', 'rotar', 'reinvertir', 'comprar', 'comprar_parcial', 'comprar_mas', 'vender', 'vender_todo', 'reducir_sector', 'reducir_riesgo'].indexOf(r.accion) >= 0;
   }
 
   // Activos nuevos
@@ -650,22 +735,33 @@
 
   // Rebalanceo
 
-  function rebalanceo(cartera, objetivo, comision) {
+  // Rebalanceo por bandas: solo se opera un grupo que se salió de su objetivo por más de `banda` puntos.
+  // Dentro de un grupo se vende primero lo que está en pérdida (realiza la pérdida) y después lo más grande.
+  function rebalanceo(cartera, objetivo, comision, banda, aportacion) {
+    var tolerancia = banda == null ? 0.05 : banda;
     var total = suma(cartera, valorARS);
     var filas = Object.keys(GRUPOS).map(function (gr) {
       var actual = suma(cartera.filter(function (p) { return p.grupo === gr; }), valorARS);
       var meta = (objetivo[gr] || 0) * total;
-      return { grupo: gr, nombre: GRUPOS[gr], actualPct: total ? actual / total : 0, objetivoPct: objetivo[gr] || 0, diferencia: meta - actual };
+      var actualPct = total ? actual / total : 0;
+      return {
+        grupo: gr, nombre: GRUPOS[gr], actualPct: actualPct, objetivoPct: objetivo[gr] || 0,
+        diferencia: meta - actual, fueraBanda: Math.abs(actualPct - (objetivo[gr] || 0)) > tolerancia
+      };
     });
     var ventas = [];
-    filas.filter(function (f) { return f.diferencia < 0; }).forEach(function (f) {
+    filas.filter(function (f) { return f.diferencia < 0 && f.fueraBanda; }).forEach(function (f) {
       var resta = -f.diferencia;
       cartera.filter(function (p) { return p.grupo === f.grupo; })
-        .sort(function (a, b) { return b.valorARS - a.valorARS; })
+        .sort(function (a, b) {
+          var ga = a.ganancia == null ? 1 : a.ganancia;
+          var gb = b.ganancia == null ? 1 : b.ganancia;
+          return ga - gb || b.valorARS - a.valorARS;
+        })
         .forEach(function (p) {
           if (resta <= 0) return;
           var monto = Math.min(resta, p.valorARS);
-          ventas.push({ simbolo: p.simbolo, montoARS: monto, cantidad: Math.min(p.cantidad, Math.ceil(monto / (p.valorARS / p.cantidad))) });
+          ventas.push({ simbolo: p.simbolo, montoARS: monto, cantidad: Math.min(p.cantidad, Math.ceil(monto / (p.valorARS / p.cantidad))), ganancia: p.ganancia });
           resta -= monto;
         });
     });
@@ -673,9 +769,26 @@
       total: total,
       filas: filas,
       ventas: ventas,
+      compras: compras(filas, total, objetivo, aportacion),
+      banda: tolerancia,
       sumaObjetivo: suma(Object.keys(GRUPOS), function (gr) { return objetivo[gr] || 0; }),
-      comisionARS: suma(filas, function (f) { return Math.abs(f.diferencia); }) * comision
+      comisionARS: suma(filas.filter(function (f) { return f.fueraBanda; }), function (f) { return Math.abs(f.diferencia); }) * comision
     };
+  }
+
+  // Aportar sin vender: la plata nueva va a los grupos por debajo de su objetivo, en proporción a lo que les falta
+  // (el total pasa a ser el actual más la aportación). Si el objetivo suma 100 %, se reparte todo.
+  function compras(filas, total, objetivo, aportacion) {
+    if (!(aportacion > 0)) return [];
+    var nuevoTotal = total + aportacion;
+    var faltas = filas.map(function (f) {
+      return { grupo: f.grupo, nombre: f.nombre, falta: (objetivo[f.grupo] || 0) * nuevoTotal - (f.actualPct * total) };
+    }).filter(function (x) { return x.falta > 0; });
+    var necesidad = suma(faltas, function (x) { return x.falta; });
+    if (!(necesidad > 0)) return [];
+    return faltas.map(function (x) {
+      return { grupo: x.grupo, nombre: x.nombre, montoARS: aportacion * x.falta / necesidad };
+    });
   }
 
   // Calendario de flujos

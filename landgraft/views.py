@@ -10,11 +10,12 @@ import json
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.middleware.csrf import get_token
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods, require_POST
 from django.views.generic import TemplateView
 
-from . import byma, seleccion, servicio_seleccion, yahoo
-from .models import Documento
+from . import byma, estrategia, medicion, riesgo, seleccion, servicio_seleccion, yahoo
+from .models import Documento, PrecioDiario
 
 DOLAR_URL = 'https://dolarapi.com/v1/dolares'
 CRIPTO_URL = 'https://api.coingecko.com/api/v3/simple/price'
@@ -142,6 +143,10 @@ def analisis(request):
     pedidos = [s for s in request.GET.get('simbolos', '').upper().split(',') if SIMBOLO.match(s)][:60]
     activos, errores = {}, {}
     cotizaciones = byma._seguro(byma.precios) or {}
+    # Tipo de cada especie: de BYMA y, si BYMA no tiene precios vigentes, de la historia guardada.
+    tipos = {s: c['tipo'] for s, c in cotizaciones.items()}
+    for s, t in PrecioDiario.objects.filter(simbolo__in=pedidos).exclude(tipo='').values_list('simbolo', 'tipo').distinct():
+        tipos.setdefault(s, t)
 
     # Acciones y CEDEAR: Yahoo Finance, con el tipo que informa BYMA.
     renta_variable, criptos = [], []
@@ -151,10 +156,10 @@ def analisis(request):
             activos[s] = guardado
         elif s in CRIPTOS:
             criptos.append(s)
-        elif (cotizaciones.get(s) or {}).get('tipo') in ('accion', 'cedear'):
+        elif tipos.get(s) in ('accion', 'cedear'):
             renta_variable.append(s)
     with ThreadPoolExecutor(max_workers=8) as grupo:
-        for simbolo, datos, error in grupo.map(lambda s: _yahoo_seguro(s, cotizaciones[s]['tipo']), renta_variable):
+        for simbolo, datos, error in grupo.map(lambda s: _yahoo_seguro(s, tipos[s]), renta_variable):
             if datos:
                 activos[simbolo] = datos
                 cache.set('landgraft:analisis:' + simbolo, datos, CACHE_ANALISIS)
@@ -189,6 +194,9 @@ def analisis(request):
             except ERRORES_RED:
                 datos['tirMetodo'] = 'sin TIR: no se pudo leer la ficha técnica'
         activos[s] = datos
+    # Volatilidad en USD con la historia de la base (la de Yahoo es en pesos): mide mejor el riesgo real.
+    for s, v in riesgo.volatilidades([s for s in activos if s in pedidos]).items():
+        activos[s]['volatilidad'] = v
     sin_fuente = [s for s in pedidos if s not in activos]
     return JsonResponse({'leido': _ahora(), 'activos': activos, 'errores': errores, 'sinFuente': sin_fuente})
 
@@ -244,3 +252,47 @@ def datos(request, clave):
         return JsonResponse({'error': 'Se esperaba JSON con el campo "valor".'}, status=400)
     doc, _ = Documento.objects.update_or_create(usuario=request.user, clave=clave, defaults={'valor': valor})
     return JsonResponse({'ok': True, 'actualizado': doc.actualizado.isoformat()})
+
+
+@csrf_exempt  # solo calcula, no guarda nada
+@require_POST
+def riesgo_view(request):
+    """Riesgo de la cartera en USD. Cuerpo: {"posiciones": [{simbolo, tipo, moneda, valorARS, duration, rend, ...}]}."""
+    try:
+        posiciones = json.loads(request.body or b'{}').get('posiciones') or []
+    except (ValueError, AttributeError):
+        return JsonResponse({'error': 'Se esperaba JSON con "posiciones".'}, status=400)
+    if not isinstance(posiciones, list) or len(posiciones) > 200:
+        return JsonResponse({'error': 'Lista de posiciones inválida.'}, status=400)
+    try:
+        tasa = _leer_tasas()['plazoFijo']
+    except ERRORES_RED:
+        tasa = 0.22
+    return JsonResponse(riesgo.medir(posiciones, tasa))
+
+
+def estrategia_view(request):
+    """Pesos contra dólar y tasa fija contra CER. Se guarda 10 minutos."""
+    guardada = cache.get('landgraft:estrategia')
+    if guardada is None:
+        try:
+            dolar = _leer_dolar()
+            tasas = _leer_tasas()
+        except ERRORES_RED:
+            return JsonResponse({'error': 'No se pudieron leer el dólar o las tasas.'}, status=503)
+        guardada = estrategia.analizar(dolar['mep'], dolar['oficial'], tasas['inflacionEsperada'])
+        if 'error' not in guardada:
+            cache.set('landgraft:estrategia', guardada, 10 * 60)
+    return JsonResponse(guardada)
+
+
+def medicion_view(request):
+    """Cuánto acertó el screener: rendimiento y alfa frente al Merval en USD, a 30, 90 y 180 días. Se guarda 30 minutos."""
+    guardada = cache.get('landgraft:medicion')
+    if guardada is None:
+        guardada = medicion.medir()
+        if 'error' not in guardada:
+            cache.set('landgraft:medicion', guardada, 30 * 60)
+        else:
+            return JsonResponse(guardada, status=404)
+    return JsonResponse(guardada)

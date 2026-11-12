@@ -112,3 +112,37 @@ def universo_renta_variable(maximo=60):
              if c['tipo'] in ('accion', 'cedear') and c.get('monedaCotizacion') == 'ARS']
     filas.sort(key=lambda x: -(x[1].get('volumen') or 0))
     return [(s, c['tipo']) for s, c in filas[:maximo]]
+
+
+def ingestar_indice(simbolo='^MERV', dias=730):
+    """Historia diaria de un índice en pesos (Yahoo Finance) con su símbolo tal cual. Devuelve cuántos cierres se guardaron."""
+    try:
+        cierres = yf.Ticker(simbolo).history(period=f'{dias}d')['Close'].dropna()
+    except Exception:  # yfinance lanza errores propios además de los de red
+        logger.warning('Yahoo Finance: sin historia para %s', simbolo, exc_info=True)
+        return 0
+    filas = [PrecioDiario(simbolo=simbolo, tipo='indice', fecha=i.date(), cierre=float(v), moneda='ARS', fuente='Yahoo Finance')
+             for i, v in cierres.items()]
+    PrecioDiario.objects.bulk_create(filas, ignore_conflicts=True)
+    return len(filas)
+
+
+def completar_historia_de_selecciones():
+    """Baja la historia de los elegidos del screener que aún no la tienen, y la del índice de referencia.
+
+    El universo de la ingesta diaria son los más operados, y el screener elige también entre otros:
+    sin esta función, parte de lo elegido no se podría medir."""
+    from .medicion import INDICE, ULTIMAS_SELECCIONES, TIPOS_MEDIBLES
+    from .models import SeleccionHistorica
+    tipos = {}
+    for sel in SeleccionHistorica.objects.order_by('-calculada')[:ULTIMAS_SELECCIONES]:
+        for t in TIPOS_MEDIBLES:
+            for p in (sel.resultado.get('tipos') or {}).get(t) or []:
+                tipos.setdefault(p['simbolo'], t)
+    con_historia = set(PrecioDiario.objects.filter(simbolo__in=list(tipos), fuente='Yahoo Finance')
+                       .values_list('simbolo', flat=True).distinct())
+    faltan = [(s, t) for s, t in tipos.items() if s not in con_historia]
+    resultado = {'indice': ingestar_indice(INDICE)}
+    if faltan:
+        resultado['elegidos'] = backfill_yahoo(faltan, 365)
+    return resultado

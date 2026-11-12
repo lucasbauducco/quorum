@@ -8,7 +8,7 @@
   var G = window.LandgraftGraficos;
   var A = window.LandgraftAlmacen;
 
-  var VISTAS = ['cartera', 'recomendaciones', 'evaluar', 'lista', 'decisiones', 'informes', 'escenarios', 'rebalanceo', 'preguntar', 'comite', 'fuentes', 'ajustes'];
+  var VISTAS = ['cartera', 'recomendaciones', 'evaluar', 'lista', 'decisiones', 'informes', 'escenarios', 'riesgo', 'estrategia', 'rebalanceo', 'preguntar', 'comite', 'fuentes', 'ajustes'];
   var MENOS_MOVIMIENTO = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var MS_PASO = MENOS_MOVIMIENTO ? 0 : 60;
   var COLUMNAS_VOTO = ['fuentes', 'dolar', 'acciones', 'rentafija', 'macro', 'noticias', 'liquidez', 'guardian', 'escenarios', 'compliance', 'tamano', 'comite', 'fiscal'];
@@ -51,6 +51,9 @@
     escDetalle: 'crisis',
     importacion: null,
     chat: [],
+    riesgo: null,
+    riesgoMapa: null,
+    estrategia: null,
     carteraId: 'lucas',
     carteras: [{ id: 'lucas', nombre: 'Lucas' }],
     analisis: {},
@@ -95,7 +98,8 @@
     return {
       cartera: c || cartera(), fx: D.FX, ref: D.REFERENCIAS, limites: estado.config.limites,
       fuentes: estado.fuentes, noticias: D.NOTICIAS, hoy: D.HOY, instrumentos: estado.instrumentos, restringidos: [],
-      analisis: estado.analisis
+      analisis: estado.analisis,
+      riesgo: estado.riesgoMapa
     };
   }
 
@@ -898,7 +902,8 @@
           celda('mep', 100, 'Variación del MEP en %'),
           celda('tasas', 100, 'Suba de tasas en puntos'),
           celda('merval', 100, 'Variación del Merval en %'),
-          celda('cedear', 100, 'Variación de los CEDEAR en %')
+          celda('cedear', 100, 'Variación de los CEDEAR en %'),
+          celda('spread', 10000, 'Suba del riesgo país en puntos básicos')
         ]));
       });
       var sel = $('#esc-detalle-select');
@@ -951,14 +956,16 @@
     calcular();
 
     function calcular() {
-      var rb = F.rebalanceo(c, estado.config.objetivo, estado.config.limites.comision);
+      var banda = estado.config.limites.banda || 0.05;
+      var aporte = F.toNum($('#reb-aporte').value);
+      var rb = F.rebalanceo(c, estado.config.objetivo, estado.config.limites.comision, banda, isFinite(aporte) ? aporte : 0);
       var umbral = rb.total * 0.005;
       rb.filas.forEach(function (f) {
         var fila = $('#cuerpo-rebalanceo tr[data-fila="' + f.grupo + '"]');
         fila.children[1].textContent = F.pct(f.actualPct);
         fila.children[3].textContent = dineroSigno(f.diferencia);
         fila.children[3].className = claseSigno(f.diferencia);
-        fila.children[4].textContent = Math.abs(f.diferencia) < umbral ? 'Sin cambios' : f.diferencia > 0 ? 'Comprar' : 'Vender';
+        fila.children[4].textContent = !f.fueraBanda ? 'Dentro de la banda (±' + Math.round(banda * 100) + ' puntos)' : f.diferencia > 0 ? 'Comprar' : 'Vender';
       });
       var ok = Math.abs(rb.sumaObjetivo - 1) < 0.001;
       $('#reb-total').textContent = ok ? 'El objetivo suma 100 %.' : 'El objetivo suma ' + F.pct(rb.sumaObjetivo) + ': tiene que sumar 100 %.';
@@ -966,13 +973,19 @@
       if (!ok) {
         ventas.appendChild(el('li', { clase: 'muted', texto: 'Ajustá el objetivo para ver las ventas sugeridas.' }));
         $('#reb-comision').textContent = '';
+        vaciar($('#reb-compras'));
         return;
       }
       rb.ventas.filter(function (v) { return v.montoARS >= umbral; }).forEach(function (v) {
-        ventas.appendChild(el('li', { clase: 'item' }, [el('span', { texto: 'Vender ' + num(v.cantidad, 0) + ' de ' + v.simbolo }), el('b', { texto: dinero(v.montoARS) })]));
+        ventas.appendChild(el('li', { clase: 'item' }, [el('span', { texto: 'Vender ' + num(v.cantidad, 0) + ' de ' + v.simbolo }), el('b', { texto: dinero(v.montoARS) + (v.ganancia != null && v.ganancia < 0 ? ' · realiza pérdida' : '') })]));
       });
-      if (!ventas.firstChild) ventas.appendChild(el('li', { clase: 'muted', texto: 'No hace falta vender: la cartera ya está cerca del objetivo.' }));
+      if (!ventas.firstChild) ventas.appendChild(el('li', { clase: 'muted', texto: 'No hace falta vender: ningún grupo se salió de la banda de ±' + Math.round(banda * 100) + ' puntos.' }));
       $('#reb-comision').textContent = 'Comisión estimada de todo el rebalanceo: ' + dinero(rb.comisionARS) + '. Para comprar, elegí instrumentos en Evaluar activo.';
+      var compras = vaciar($('#reb-compras'));
+      rb.compras.forEach(function (c) {
+        compras.appendChild(el('li', { clase: 'item' }, [el('span', { texto: 'Aportar a ' + c.nombre }), el('b', { texto: dinero(c.montoARS) })]));
+      });
+      if (!compras.firstChild) compras.appendChild(el('li', { clase: 'muted', texto: 'Escribí cuánto vas a aportar para ver a qué grupo conviene destinarlo.' }));
     }
   }
 
@@ -982,6 +995,7 @@
     guardarConfig();
     renderRebalanceo();
   });
+  $('#reb-aporte').addEventListener('input', renderRebalanceo);
 
   // Preguntar
 
@@ -1116,7 +1130,7 @@
 
   // Ajustes
 
-  var CAMPOS_PCT = ['emisor', 'soberana', 'liquidezMin', 'gananciaReducir', 'pesoReducir', 'perdidaRevisar', 'recorte', 'perdidaEscenario', 'comision'];
+  var CAMPOS_PCT = ['emisor', 'soberana', 'liquidezMin', 'gananciaReducir', 'pesoReducir', 'perdidaRevisar', 'recorte', 'perdidaEscenario', 'comision', 'sector', 'contribRiesgo', 'banda'];
 
   function llenarLimites(limites) {
     $$('#form-limites [data-limite]').forEach(function (i) {
@@ -1125,7 +1139,11 @@
   }
 
   function renderAjustes() {
-    $('#aj-perfil').value = estado.config.perfil;
+    var selPerfil = vaciar($('#aj-perfil'));
+    Object.keys(F.PERFILES).forEach(function (k) { selPerfil.appendChild(el('option', { value: k, texto: F.PERFILES[k].nombre })); });
+    selPerfil.appendChild(el('option', { value: 'personalizado', texto: 'Personalizado' }));
+    selPerfil.value = estado.config.perfil;
+    pintarPerfil(estado.config.perfil);
     llenarLimites(estado.config.limites);
     var al = estado.config.alertas;
     $('#al-canal').value = al.canal;
@@ -1138,6 +1156,18 @@
       : A.modo() === 'db'
       ? 'Tus datos se guardan en tu espacio privado de este artifact: solo vos podés verlos. También queda una copia en este navegador.'
       : 'Tus datos se guardan solo en este navegador. Abrí la página en claude.ai para guardarlos en tu espacio privado.';
+  }
+
+  function pintarPerfil(clave) {
+    var caja = vaciar($('#aj-perfil-desc'));
+    var p = F.PERFILES[clave];
+    if (!p) { caja.hidden = true; return; }
+    caja.hidden = false;
+    var o = p.objetivo;
+    caja.appendChild(el('h4', { texto: p.nombre }));
+    caja.appendChild(el('p', { texto: p.descripcion }));
+    caja.appendChild(el('p', { clase: 'muted', texto: 'Asignación objetivo: ' + Object.keys(F.GRUPOS).map(function (g) { return F.GRUPOS[g] + ' ' + F.pct(o[g] || 0); }).join(' · ') + '.' }));
+    caja.appendChild(el('p', { clase: 'muted', texto: 'Riesgos: ' + p.riesgos }));
   }
 
   function renderAlertasHoy() {
@@ -1154,6 +1184,7 @@
   $('#aj-perfil').addEventListener('change', function () {
     var p = F.PERFILES[this.value];
     if (p) llenarLimites(p.limites);
+    pintarPerfil(this.value);
   });
 
   $$('#form-limites [data-limite]').forEach(function (i) {
@@ -1225,6 +1256,139 @@
     renderAjustes();
   });
 
+  // Riesgo de la cartera (backend: riesgo.py, con la historia guardada en la base)
+
+  function posicionesParaRiesgo() {
+    return cartera().map(function (p) {
+      return { simbolo: p.simbolo, tipo: p.tipo, moneda: p.moneda, valorARS: p.valorARS, rend: p.rend, rendEnUsd: p.rendEnUsd, rendReal: p.rendReal, duration: p.duration };
+    });
+  }
+
+  function cargarRiesgo() {
+    if (!window.fetch || !estado.tenencias.length) return Promise.resolve();
+    return fetch('api/riesgo/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ posiciones: posicionesParaRiesgo() }) })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        estado.riesgo = j;
+        estado.riesgoMapa = null;
+        if (!j.error) {
+          estado.riesgoMapa = {};
+          j.posiciones.forEach(function (x) { estado.riesgoMapa[x.simbolo] = x; });
+        }
+        estado.resultadosCartera = null;
+      })
+      .catch(function () { estado.riesgo = { error: 'No se pudo calcular el riesgo: revisá la conexión con el servidor.' }; });
+  }
+
+  function renderRiesgo() {
+    var caja = vaciar($('#riesgo-contenido'));
+    if (!estado.riesgo) {
+      caja.appendChild(el('p', { clase: 'muted', texto: 'Calculando el riesgo con la historia guardada…' }));
+      cargarRiesgo().then(function () { if (location.hash === '#riesgo') renderRiesgo(); });
+      return;
+    }
+    var r = estado.riesgo;
+    if (r.error) { caja.appendChild(el('p', { clase: 'status neg', texto: r.error })); return; }
+    var c = r.cartera;
+    var total = F.resumen(cartera()).total;
+    function k(titulo, valor, ayuda) { return el('div', { clase: 'kpi' }, [el('span', { texto: titulo }), el('b', { texto: valor }), ayuda ? el('small', { texto: ayuda }) : null]); }
+    caja.appendChild(el('div', { clase: 'kpis' }, [
+      k('Volatilidad anual', F.pct(c.volatilidad), 'cuánto se mueve en un año'),
+      k('VaR 10 ruedas, 95 %', '−' + F.pct(c.var10d95), 'unos ' + dinero(total * c.var10d95)),
+      k('CVaR 10 ruedas, 95 %', '−' + F.pct(c.cvar10d95), 'el promedio de los peores casos'),
+      k('Máxima caída', F.pctSigno(c.maxDrawdown), 'de pico a valle en el período'),
+      k('Sharpe', String(c.sharpe).replace('.', ','), 'retorno por unidad de riesgo'),
+      k('Sortino', String(c.sortino).replace('.', ','), 'igual, mirando solo las caídas')
+    ]));
+    caja.appendChild(el('p', { clase: 'muted', texto: 'El VaR dice que en 19 de cada 20 períodos de 10 ruedas la cartera no perdió más que eso. Período medido: ' + F.fechaCorta(r.desde) + ' al ' + F.fechaCorta(r.hasta) + ' (' + r.dias + ' días).' }));
+
+    var filas = r.posiciones.map(function (p) {
+      var exceso = p.contribucionRiesgo > (estado.config.limites.contribRiesgo || 0.25);
+      return el('tr', null, [
+        el('td', { clase: 'txt' }, [el('b', { texto: p.simbolo })]),
+        el('td', { texto: F.pct(p.peso) }),
+        el('td', { texto: F.pct(p.volatilidad) }),
+        el('td', { clase: 'neg', texto: F.pctSigno(p.maxDrawdown) }),
+        el('td', { clase: claseSigno(p.retornoUsd), texto: F.pctSigno(p.retornoUsd) }),
+        el('td', { clase: exceso ? 'neg' : '', texto: F.pct(p.contribucionRiesgo) + (exceso ? ' · supera el límite' : '') }),
+        el('td', { clase: 'txt muted', texto: p.metodo })
+      ]);
+    });
+    caja.appendChild(el('div', { clase: 'bloque' }, [
+      el('h3', { texto: 'Qué posición aporta más riesgo' }),
+      el('div', { clase: 'scroll' }, [el('table', { clase: 'tbl' }, [
+        el('thead', null, [el('tr', null, ['Posición', 'Peso', 'Volatilidad', 'Máx. caída', 'Retorno 1 año (USD)', 'Aporte al riesgo', 'Cómo se mide'].map(function (t, i) { return el('th', { clase: i === 0 || i === 6 ? 'txt' : '', texto: t }); }))]),
+        el('tbody', null, filas)
+      ])])
+    ]));
+    if (r.correlacionAlta.length) {
+      caja.appendChild(el('div', { clase: 'bloque' }, [
+        el('h3', { texto: 'Posiciones que se mueven juntas' }),
+        el('ul', { clase: 'lista' }, r.correlacionAlta.map(function (x) {
+          return el('li', { texto: x.a + ' y ' + x.b + ': correlación de ' + String(x.correlacion).replace('.', ',') + '. Tener las dos diversifica poco.' });
+        }))
+      ]));
+    }
+    if (r.sinMedir.length) {
+      caja.appendChild(el('p', { clase: 'muted', texto: 'Sin medir por falta de historia: ' + r.sinMedir.map(function (x) { return x.simbolo; }).join(', ') + '. No entran en las cifras de arriba.' }));
+    }
+    caja.appendChild(el('ul', { clase: 'lista muted' }, r.notas.map(function (n) { return el('li', { texto: n }); })));
+  }
+
+  // Pesos contra dólar y tasa fija contra CER (backend: estrategia.py)
+
+  function renderEstrategia() {
+    var caja = vaciar($('#estrategia-contenido'));
+    var vigente = estado.estrategia && Date.now() - estado.estrategia.hora < 10 * 60 * 1000;
+    if (!vigente) {
+      caja.appendChild(el('p', { clase: 'muted', texto: 'Consultando la curva de letras, los dollar linked y los bonos CER…' }));
+      fetch('api/estrategia/').then(function (r) { return r.json(); }).then(function (e) {
+        estado.estrategia = { datos: e, hora: Date.now() };
+        if (location.hash === '#estrategia') renderEstrategia();
+      }).catch(function () {
+        estado.estrategia = { datos: { error: 'No se pudo consultar el servidor.' }, hora: Date.now() };
+        if (location.hash === '#estrategia') renderEstrategia();
+      });
+      return;
+    }
+    var e = estado.estrategia.datos;
+    if (e.error) {
+      caja.appendChild(el('p', { clase: 'status neg', texto: e.error + ' Si el mercado todavía no abrió (BYMA publica los precios desde las 11), probá más tarde.' }));
+      return;
+    }
+    caja.appendChild(el('div', { clase: 'bloque' }, [
+      el('h3', { texto: 'Qué dicen las señales' }),
+      el('ul', { clase: 'lista' }, e.conclusiones.map(function (t) { return el('li', { texto: t }); }))
+    ]));
+    var c = e.carry;
+    function k(t, v, a) { return el('div', { clase: 'kpi' }, [el('span', { texto: t }), el('b', { texto: v }), a ? el('small', { texto: a }) : null]); }
+    caja.appendChild(el('div', { clase: 'kpis' }, [
+      k('Letra de referencia', c.lecap, c.dias + ' días'),
+      k('Rinde (TEA)', F.pct(c.tea)),
+      k('MEP hoy', num(c.mepHoy, 0)),
+      k('MEP de equilibrio', num(c.mepEquilibrio, 0), 'sube ' + F.pct(c.subaEquilibrio) + ' para igualar'),
+      k('Inflación esperada', F.pct(e.inflacionEsperada), 'últimos 3 meses anualizados')
+    ]));
+    function tabla(titulo, ayuda, cols, filas, vacio) {
+      var bloque = el('div', { clase: 'bloque' }, [el('h3', { texto: titulo }), el('p', { clase: 'muted', texto: ayuda })]);
+      if (!filas.length) { bloque.appendChild(el('p', { clase: 'muted', texto: vacio })); return bloque; }
+      bloque.appendChild(el('div', { clase: 'scroll' }, [el('table', { clase: 'tbl' }, [
+        el('thead', null, [el('tr', null, cols.map(function (t, i) { return el('th', { clase: i === 0 ? 'txt' : '', texto: t }); }))]),
+        el('tbody', null, filas)
+      ])]));
+      return bloque;
+    }
+    caja.appendChild(tabla('Dólar que descuentan los dollar linked', 'Lo que el mercado espera que suba el oficial hasta cada vencimiento, comparando con las LECAP del mismo plazo.',
+      ['Letra', 'Vence', 'Días', 'Dólar implícito', 'Suba total', 'Anualizada'],
+      e.devaluacionImplicita.map(function (x) { return el('tr', null, [el('td', { clase: 'txt', texto: x.simbolo }), el('td', { texto: F.fechaCorta(x.vence) }), el('td', { texto: String(x.dias) }), el('td', { texto: num(x.tipoCambio, 0) }), el('td', { texto: F.pctSigno(x.devaluacion) }), el('td', { texto: F.pctSigno(x.anual) })]); }),
+      'No hay dollar linked con precio ahora.'));
+    caja.appendChild(tabla('Tasa fija contra CER', 'El breakeven es la inflación anual a partir de la cual el bono CER rinde más que la tasa fija del mismo plazo.',
+      ['Bono CER', 'Vence', 'Días', 'TIR real', 'Tasa fija (TEA)', 'Breakeven'],
+      e.breakevenInflacion.map(function (x) { return el('tr', null, [el('td', { clase: 'txt', texto: x.simbolo }), el('td', { texto: F.fechaCorta(x.vence) }), el('td', { texto: String(x.dias) }), el('td', { texto: F.pct(x.tirReal) }), el('td', { texto: F.pct(x.tasaFija) }), el('td', { texto: F.pct(x.breakeven) })]); }),
+      'No hay bonos CER con precio ahora.'));
+    caja.appendChild(el('p', { clase: 'muted', texto: e.notas.join(' ') }));
+  }
+
   // Rutas
 
   function mostrar() {
@@ -1249,6 +1413,8 @@
       decisiones: renderDecisiones,
       informes: renderInforme,
       escenarios: renderEscenarios,
+      riesgo: renderRiesgo,
+      estrategia: renderEstrategia,
       rebalanceo: renderRebalanceo,
       preguntar: renderChat,
       comite: renderComite,
@@ -1368,6 +1534,8 @@
       }
       estado.resultadosCartera = null;
       estado.resultadosLista = null;
+      estado.riesgo = null;
+      estado.riesgoMapa = null;
       estado.ultimo = null;
       estado.textosInforme = {};
       vaciar($('#lista-resultado'));
@@ -1548,6 +1716,7 @@
         estado.resultadosCartera = null;
       })
       .catch(function () { $('#estado-guardado').textContent = previo + ' · sin información financiera'; })
+      .then(cargarRiesgo)
       .then(function () {
         estado.promesaAnalisis = null;
         if (!estado.ocupado) mostrar();

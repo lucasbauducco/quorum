@@ -1,10 +1,12 @@
 """Datos abiertos de BYMA (open.bymadata.com.ar): precios del día, fichas técnicas y la TIR que se deriva de ellas."""
+import json
 import logging
 import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
 
 import requests
+from django.conf import settings
 from django.core.cache import cache
 
 SITIO = 'https://open.bymadata.com.ar'
@@ -71,9 +73,38 @@ def precios():
                 'volumen': f.get('volumeAmount') or 0,
                 'tipo': PANELES[panel],
             }
-    if resultado:
+    if len(resultado) > 500:
         cache.set('landgraft:byma:precios', resultado, CACHE_PRECIOS)
+        _guardar_respaldo(resultado)
+        return resultado
+    # Antes de abrir el mercado BYMA publica todo en cero: se usan los últimos precios buenos, marcados como viejos.
+    anteriores = _leer_respaldo()
+    if anteriores:
+        logger.warning('BYMA sin precios vigentes: se usa el último resultado guardado (%s)', anteriores['fecha'])
+        datos = anteriores['precios']
+        for d in datos.values():
+            d['desactualizado'] = anteriores['fecha']
+        cache.set('landgraft:byma:precios', datos, 60)
+        return datos
     return resultado
+
+
+RESPALDO = settings.BASE_DIR / '.cache' / 'byma_precios.json'
+
+
+def _guardar_respaldo(precios_):
+    try:
+        RESPALDO.parent.mkdir(exist_ok=True)
+        RESPALDO.write_text(json.dumps({'fecha': date.today().isoformat(), 'precios': precios_}), encoding='utf-8')
+    except OSError:
+        logger.warning('No se pudo guardar el respaldo de precios', exc_info=True)
+
+
+def _leer_respaldo():
+    try:
+        return json.loads(RESPALDO.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return None
 
 
 def _seguro(funcion, *args):

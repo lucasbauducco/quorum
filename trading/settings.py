@@ -179,4 +179,8 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'landgraft.tasks.calcular_seleccion',
         'schedule': crontab(minute=0, hour='10,16', day_of_week='1-5'),
     },
+    'landgraft-preparar-medicion': {
+        'task': 'landgraft.tasks.preparar_medicion',
+        'schedule': crontab(hour=18, minute=45, day_of_week='1-5'),
+    },
 }

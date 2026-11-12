@@ -38,6 +38,10 @@ def analizar(local, subyacente):
         datos['varDia'] = round(float(cierres.iloc[-1] / cierres.iloc[-2] - 1) * 100, 2) if len(cierres) > 1 else None
         datos['var6m'] = _variacion(cierres, 126)
         datos['var1y'] = _variacion(cierres, len(cierres) - 1)
+        if len(cierres) >= 200:
+            datos['momentum12_1'] = round(float(cierres.iloc[-22] / cierres.iloc[0] - 1), 4)
+        if len(cierres) >= 60:
+            datos['volatilidad'] = round(float(cierres.pct_change().std() * 252 ** 0.5), 4)
     info = yf.Ticker(subyacente or local).info
     precio = info.get('currentPrice') or info.get('regularMarketPrice')
     objetivo = info.get('targetMeanPrice')
@@ -47,4 +51,5 @@ def analizar(local, subyacente):
     datos['upside'] = round(objetivo / precio - 1, 4) if objetivo and precio else None
     datos['per'] = round(info['trailingPE'], 1) if info.get('trailingPE') else None
     datos['nombre'] = info.get('shortName')
+    datos['sector'] = info.get('sector') or info.get('category')
     return datos

@@ -52,6 +52,11 @@
   // Cartera real, tomada de IOL: valor de mercado, PPC (precio promedio de compra) y rendimiento.
   // Con esos tres datos se reconstruyen el precio actual y la cantidad (estimada).
   // Bonos y ON cotizan cada 100 nominales.
+  var SECTORES = {
+    GGAL: 'Bancos', YPFD: 'Energía', CEPU: 'Energía', BYMA: 'Servicios financieros', YM38O: 'Energía',
+    GLD: 'Oro', GOOGL: 'Tecnología', AMZN: 'Tecnología', META: 'Tecnología'
+  };
+
   var IOL = [
     // simbolo, tipo, emisor, valor ARS, PPC, rendimiento[, cantidad exacta si se conoce]
     ['AMZN', 'cedear', 'Amazon', 108937.5, 2801.00, 0.1023],
@@ -71,7 +76,7 @@
     var cotiza = f[1] === 'bono' || f[1] === 'on' ? 100 : 1;
     var exacta = f[6] != null;
     var cantidad = exacta ? f[6] : f[3] * cotiza / (f[4] * (1 + f[5]));
-    return { simbolo: f[0], tipo: f[1], moneda: 'ARS', emisor: f[2], cantidad: cantidad, precioManual: f[3] * cotiza / cantidad, costo: f[4], varDia: null, cantidadEstimada: !exacta };
+    return { simbolo: f[0], tipo: f[1], moneda: 'ARS', emisor: f[2], cantidad: cantidad, precioManual: f[3] * cotiza / cantidad, costo: f[4], varDia: null, cantidadEstimada: !exacta, sector: SECTORES[f[0]] };
   }).concat([
     // Criptos: cantidad exacta y PPC de IOL; el precio sale de dividir el valor por la cantidad.
     { simbolo: 'BTC', tipo: 'cripto', moneda: 'ARS', cantidad: 0.00342488, precio: 424748.44 / 0.00342488, costo: 120810854.66 },

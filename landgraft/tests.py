@@ -102,3 +102,50 @@ class CurvaTests(TestCase):
         self.assertAlmostEqual(seleccion._interpolar(curva, 3.0), 0.11)
         self.assertEqual(seleccion._interpolar(curva, 0.5), 0.10)
         self.assertEqual(seleccion._interpolar(curva, 9.0), 0.12)
+
+
+class RiesgoTests(TestCase):
+    def setUp(self):
+        from datetime import timedelta
+        from .models import Indicador, PrecioDiario
+        hoy = date.today()
+        indicadores, precios = [], []
+        for k in range(120):
+            f = hoy - timedelta(days=120 - k)
+            indicadores.append(Indicador(nombre='mep', fecha=f, valor=1000 * (1.001 ** k), fuente='prueba'))
+            # El activo sube 1 % por día en pesos y alterna ±3 %: tiene volatilidad.
+            precios.append(PrecioDiario(simbolo='XYZ', tipo='accion', fecha=f, cierre=100 * (1.01 ** k) * (1.03 if k % 2 else 0.97),
+                                        fuente='Yahoo Finance'))
+        Indicador.objects.bulk_create(indicadores)
+        PrecioDiario.objects.bulk_create(precios)
+
+    def test_mide_la_cartera_y_la_caja_no_aporta_riesgo(self):
+        from . import riesgo
+        r = riesgo.medir([{'simbolo': 'XYZ', 'tipo': 'accion', 'moneda': 'ARS', 'valorARS': 500},
+                          {'simbolo': 'USD', 'tipo': 'caja', 'moneda': 'USD', 'valorARS': 500}])
+        self.assertNotIn('error', r)
+        por_simbolo = {p['simbolo']: p for p in r['posiciones']}
+        self.assertGreater(por_simbolo['XYZ']['volatilidad'], 0.3)
+        self.assertEqual(por_simbolo['USD']['volatilidad'], 0.0)
+        self.assertAlmostEqual(por_simbolo['XYZ']['contribucionRiesgo'], 1.0, places=2)  # toda la volatilidad es de XYZ
+        # La serie de prueba solo sube: ninguna ventana de 10 ruedas pierde, así que el VaR es negativo y el CVaR lo acompaña.
+        self.assertLessEqual(r['cartera']['var10d95'], r['cartera']['cvar10d95'])
+
+    def test_sin_historia_del_mep_avisa(self):
+        from . import riesgo
+        from .models import Indicador
+        Indicador.objects.all().delete()
+        self.assertIn('error', riesgo.medir([{'simbolo': 'XYZ', 'tipo': 'accion', 'moneda': 'ARS', 'valorARS': 1}]))
+
+    def test_endpoint_rechaza_cuerpo_invalido(self):
+        r = Client().post('/landgraft/api/riesgo/', 'no es json', content_type='application/json')
+        self.assertEqual(r.status_code, 400)
+
+
+class EstrategiaTests(TestCase):
+    def test_tea_interpolada_entre_puntos_de_la_curva(self):
+        from . import estrategia
+        curva = [(30, 0.20, 'A'), (90, 0.26, 'B')]
+        self.assertAlmostEqual(estrategia._tea_en(curva, 60), 0.23)
+        self.assertEqual(estrategia._tea_en(curva, 10), 0.20)
+        self.assertIsNone(estrategia._tea_en([], 10))
