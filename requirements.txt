@@ -9,3 +9,5 @@ beautifulsoup4==4.15.0
 yfinance==1.8.0
 pandas==3.1.1
 numpy==2.5.4
+whitenoise==6.9.0
+gunicorn==23.0.0

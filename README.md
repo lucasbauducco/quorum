@@ -1,6 +1,27 @@
 # Quórum
 
-![Python 3.12](https://img.shields.io/badge/Python-3.12-blue) ![Django 5.2](https://img.shields.io/badge/Django-5.2-092E20) ![Celery 5.7](https://img.shields.io/badge/Celery-5.7-37814A)
+![Python 3.12](https://img.shields.io/badge/Python-3.12-blue) ![Django 5.2](https://img.shields.io/badge/Django-5.2-092E20) ![Celery 5.7](https://img.shields.io/badge/Celery-5.7-37814A) ![CI](https://github.com/lucasbauducco/quorum/actions/workflows/ci.yml/badge.svg) ![Licencia MIT](https://img.shields.io/badge/licencia-MIT-green)
+
+> **English summary.** Quórum is a Django + Celery investment committee for Argentine portfolios (pesos, USD MEP and CER). It ranks stocks, CEDEARs, bonds, T-bills and corporate bonds, measures portfolio risk in USD, and records every decision to later measure it against the Merval. It never places orders. Spanish-only documentation for now; see [README.en.md](README.en.md) for an English overview and quick start.
+
+## En cinco minutos
+
+Con Docker (lo más rápido):
+
+```bash
+git clone https://github.com/lucasbauducco/quorum.git
+cd quorum
+cp .env.example .env                 # y completá DJANGO_SECRET_KEY (ver "Generar la clave secreta")
+docker compose up --build -d
+docker compose exec web python manage.py createsuperuser
+docker compose exec web python manage.py cargar_historia   # opcional: tarda unos minutos
+```
+
+Abrí <http://localhost:8000/quorum/> e ingresá con el usuario que creaste. Sin el paso de `cargar_historia`, la app funciona con la cartera de ejemplo, pero el riesgo y la medición no tienen historia.
+
+Sin Docker, seguí la sección [Instalación](#instalación).
+
+**¿Para quién es?** Para quien invierte en pesos y dólares en Argentina y quiere ver la evidencia antes de decidir: cuánto puede perder su cartera en USD, qué tan bien acertó el screener en el pasado y cuánto aportar para volver a su objetivo.
 
 **Comité de inversión para Argentina, en tu propio servidor.** Quórum junta precios de BYMA, datos de Yahoo Finance y las series de ArgentinaDatos, y con eso arma un screener de acciones, CEDEAR, bonos, letras y ON; mide el riesgo de tu cartera en dólares MEP; compara pesos contra dólar y tasa fija contra CER; y te dice cuánto aportar para volver a tu objetivo sin vender nada. Cada decisión queda registrada y, después, se mide contra el mercado.
 
@@ -20,13 +41,14 @@
 8. [Variables de entorno](#variables-de-entorno)
 9. [Primera carga de datos](#primera-carga-de-datos)
 10. [Puesta en marcha](#puesta-en-marcha)
-11. [Tareas programadas](#tareas-programadas)
-12. [API](#api)
-13. [Pruebas](#pruebas)
-14. [Estructura del repositorio](#estructura-del-repositorio)
-15. [Problemas frecuentes](#problemas-frecuentes)
-16. [Limitaciones conocidas](#limitaciones-conocidas)
-17. [Licencia](#licencia)
+11. [Docker](#docker)
+12. [Tareas programadas](#tareas-programadas)
+13. [API](#api)
+14. [Pruebas](#pruebas)
+15. [Estructura del repositorio](#estructura-del-repositorio)
+16. [Problemas frecuentes](#problemas-frecuentes)
+17. [Limitaciones conocidas](#limitaciones-conocidas)
+18. [Licencia](#licencia)
 
 ---
 
@@ -38,6 +60,26 @@ Quórum es una aplicación web en **Django** (con **Celery** para las tareas pro
 - **Un comité en el navegador**: 14 "agentes" que revisan tu cartera. Algunos son reglas, otros son cálculos, y dos tienen poder de veto (el Guardián y el de Compliance). Cada uno explica su conclusión en lenguaje claro.
 
 Lo que la diferencia de un simulador: **no ejecuta órdenes** y **no decide por vos**. Te muestra la evidencia, marca los límites que no querés romper y guarda la historia para que puedas comprobar si el screener acierta.
+
+### Así se ve
+
+Vista de la cartera, con el valor total, el resultado contra costo y las posiciones con su precio del día:
+
+![Mi cartera](docs/img/01-cartera.png)
+
+El comité: cada evaluación recorre el grafo de agentes, y los que intervinieron quedan resaltados. Los agentes con poder de veto aparecen marcados en rojo.
+
+![Grafo del comité](docs/img/02-comite.png)
+
+Riesgo de la cartera medido en dólares MEP: volatilidad, VaR y CVaR a 10 ruedas, máxima caída, Sharpe y Sortino, y cuánto aporta cada posición al riesgo total.
+
+![Riesgo](docs/img/03-riesgo.png)
+
+Rebalanceo por grupo: el objetivo contra lo que tenés hoy, las ventas sugeridas y la opción de aportar sin vender.
+
+![Rebalanceo](docs/img/04-rebalanceo.png)
+
+Las capturas usan la cartera de ejemplo que trae la app, con precios ficticios cuando no hay datos de mercado cargados.
 
 ---
 
@@ -262,7 +304,32 @@ Sin el worker, las tareas no corren. Sin el beat, no se programan. Para disparar
 
 La app también puede lanzar el screener sola: si pedís la selección y no hay una vigente, la calcula en un hilo en segundo plano.
 
+### Navegación y atajos
+
+- El menú lateral agrupa las secciones en **Cartera**, **Comité**, **Análisis** y **Sistema**. Cada grupo se pliega, y el estado se recuerda en el navegador.
+- **Buscar sección:** `Ctrl+K` o `/` enfocan el buscador del menú. Enter abre la primera coincidencia y Escape lo limpia.
+- **Tema:** el botón del sol/luna de la barra superior cambia entre oscuro (por defecto) y claro.
+- **Móvil:** en pantallas angostas el menú se abre desde el botón de hamburguesa, como cajón lateral.
+- La línea de estado de la barra muestra cuándo se leyeron las fuentes en vivo. El texto completo aparece al pasar el mouse.
+
 ---
+
+## Docker
+
+`docker-compose.yml` levanta cuatro servicios: `web` (gunicorn), `worker` y `beat` de Celery, y `redis`. La base SQLite queda en el volumen `quorum-datos`.
+
+```bash
+cp .env.example .env     # DJANGO_SECRET_KEY obligatoria
+docker compose up --build -d
+docker compose exec web python manage.py migrate
+docker compose exec web python manage.py createsuperuser
+docker compose logs -f web
+```
+
+Notas:
+- `docker-compose.yml` fija `DJANGO_DEBUG=0` y `DJANGO_HTTPS=0` para probar en `localhost`. Detrás de un dominio con HTTPS, poné `DJANGO_HTTPS=1` y agregá el dominio en `DJANGO_ALLOWED_HOSTS` y `DJANGO_CSRF_TRUSTED_ORIGINS` (por ejemplo `https://quorum.ejemplo.com`).
+- SQLite funciona bien con un solo servidor. Si escalás a varios hosts, usá PostgreSQL.
+- En producción, los estáticos los sirve WhiteNoise, previamente reunidos por `collectstatic` durante la construcción de la imagen.
 
 ## Tareas programadas
 
@@ -305,14 +372,16 @@ Las escrituras a `datos/` exigen el token CSRF de `sesion/` en el encabezado `X-
 python manage.py test quorum
 ```
 
-Son 24 pruebas: API de datos y de sesión, cálculo de TIR y cupón corrido, cronograma del GD30, liquidación de 24 horas, riesgo en USD, beta, estrategia y medición. Las pruebas no llaman a internet: usan datos fabricados.
+Son 31 pruebas en total (24 en `quorum`, más las de `cartera` y `analysisActions`). Cubren la API de datos y de sesión, cálculo de TIR y cupón corrido, cronograma del GD30, liquidación de 24 horas, riesgo en USD, beta, estrategia y medición. Las pruebas no llaman a internet: usan datos fabricados.
 
-Para el código de la interfaz:
+Para la interfaz, sin dependencias adicionales:
 
 ```bash
 node --check quorum/static/quorum/funciones.js
-node --check quorum/static/quorum/front.js
+node tests/js/rebalanceo.test.js
 ```
+
+En GitHub, el workflow `.github/workflows/ci.yml` corre estas pruebas en cada cambio y construye la imagen Docker.
 
 Verificación del sistema:
 
@@ -325,9 +394,9 @@ python manage.py check
 ## Estructura del repositorio
 
 ```
-quorum/
+tradingMarket/
 ├── config/                  Configuración del proyecto: settings, urls, celery
-├── quorum/                Comité, screener, riesgo, estrategia y medición
+├── quorum/                  Comité, screener, riesgo, estrategia y medición
 │   ├── byma.py               BYMA: precios, fichas técnicas, TIR y CER
 │   ├── yahoo.py              Yahoo Finance: analistas, precio objetivo, volatilidad
 │   ├── seleccion.py          Screener de acciones, CEDEAR, bonos, letras y ON
@@ -340,13 +409,21 @@ quorum/
 │   ├── tasks.py              Tareas de Celery
 │   ├── models.py             Documento, PrecioDiario, Indicador, SeleccionHistorica
 │   ├── management/commands/  cargar_historia
-│   ├── static/quorum/     Interfaz: funciones.js (cálculo), front.js (pantalla)
+│   ├── static/quorum/        Interfaz: funciones.js (cálculo), front.js (pantalla),
+│   │                         ui.js (menú, búsqueda y tema), styles.css (estilos)
 │   └── test_*.py, tests.py   Pruebas
 ├── cartera/                  Snapshots diarios e informes (con Claude opcional)
 ├── analysisActions/          Análisis de acciones y actualización de CEDEAR
 ├── docs/
+│   ├── img/                  Capturas de la interfaz para este README
+│   ├── plan-publicacion.md   Plan para publicar y hacer crecer el proyecto
 │   ├── arquitectura.svg      Diagrama de arquitectura
 │   └── especificacion-mejoras.md  Plan de mejoras
+├── tests/js/                 Pruebas de la interfaz (Node, sin dependencias)
+├── .github/                  CI y plantillas de issues y pull requests
+├── Dockerfile, docker-compose.yml
+├── CONTRIBUTING.md           Cómo colaborar
+├── README.en.md              Resumen en inglés
 ├── manage.py
 ├── requirements.txt
 └── .env.example

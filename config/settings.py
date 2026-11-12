@@ -60,6 +60,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -91,7 +92,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': os.environ.get('DJANGO_DB_PATH') or BASE_DIR / 'db.sqlite3',
     }
 }
 
@@ -112,6 +113,21 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
+# En producción, `collectstatic` reúne los archivos aquí y WhiteNoise los sirve.
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage' if not DEBUG else 'django.contrib.staticfiles.storage.StaticFilesStorage'},
+}
+# Orígenes desde los que se aceptan formularios (p. ej. https://quorum.ejemplo.com), separados por coma.
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.environ.get('DJANGO_CSRF_TRUSTED_ORIGINS', '').split(',') if o.strip()]
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SESSION_COOKIE_SECURE = _bool('DJANGO_HTTPS', True)
+    CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
+    if SESSION_COOKIE_SECURE:
+        SECURE_HSTS_SECONDS = 3600
+        SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Caché compartida: Redis si REDIS_URL está definido (varios procesos y Celery ven lo mismo);
