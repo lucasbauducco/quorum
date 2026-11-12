@@ -1,0 +1,57 @@
+# Quórum completo: web, worker y beat de Celery, y Redis.
+# Uso: copiar .env.example a .env, definir DJANGO_SECRET_KEY y luego `docker compose up --build`.
+services:
+  web:
+    build: .
+    env_file: .env
+    environment:
+      DJANGO_DB_PATH: /app/data/db.sqlite3
+      DJANGO_DEBUG: "0"
+      # Sin HTTPS en localhost las cookies seguras no se envían: poner 1 detrás de un dominio con HTTPS.
+      DJANGO_HTTPS: "0"
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,web
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    volumes:
+      - quorum-datos:/app/data
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  worker:
+    build: .
+    env_file: .env
+    environment:
+      DJANGO_DEBUG: "0"
+      DJANGO_DB_PATH: /app/data/db.sqlite3
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+    command: celery -A config worker --loglevel=info --concurrency=2
+    volumes:
+      - quorum-datos:/app/data
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  beat:
+    build: .
+    env_file: .env
+    environment:
+      DJANGO_DEBUG: "0"
+      DJANGO_DB_PATH: /app/data/db.sqlite3
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+    command: celery -A config beat --loglevel=info
+    volumes:
+      - quorum-datos:/app/data
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+volumes:
+  quorum-datos:

@@ -761,7 +761,11 @@
         .forEach(function (p) {
           if (resta <= 0) return;
           var monto = Math.min(resta, p.valorARS);
-          ventas.push({ simbolo: p.simbolo, montoARS: monto, cantidad: Math.min(p.cantidad, Math.ceil(monto / (p.valorARS / p.cantidad))), ganancia: p.ganancia });
+          // Cripto se opera en fracciones (hasta 8 decimales); el resto, en unidades enteras.
+          var cripto = p.tipo === 'cripto';
+          var exacta = monto / (p.valorARS / p.cantidad);
+          var cantidad = cripto ? Number(Math.min(p.cantidad, Math.ceil(exacta * 1e8) / 1e8).toFixed(8)) : Math.min(p.cantidad, Math.ceil(exacta));
+          ventas.push({ simbolo: p.simbolo, montoARS: monto, cantidad: cantidad, decimales: cripto ? 8 : 0, ganancia: p.ganancia });
           resta -= monto;
         });
     });

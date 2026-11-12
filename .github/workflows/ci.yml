@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  tests:
+    name: Pruebas (Python 3.12 y JavaScript)
+    runs-on: ubuntu-latest
+    env:
+      DJANGO_DEBUG: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Verificación del proyecto
+        run: python manage.py check
+
+      - name: Pruebas de Django
+        run: python manage.py test
+
+      - name: Sintaxis y pruebas de JavaScript
+        run: |
+          node --check quorum/static/quorum/funciones.js
+          node --check quorum/static/quorum/front.js
+          node --check quorum/static/quorum/graficos.js
+          node --check quorum/static/quorum/almacen.js
+          node --check quorum/static/quorum/datos.js
+          node --check quorum/static/quorum/ui.js
+          node tests/js/rebalanceo.test.js
+
+  docker:
+    name: Imagen Docker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Construir la imagen
+        run: docker build -t quorum:ci .
+

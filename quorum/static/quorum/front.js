@@ -977,7 +977,7 @@
         return;
       }
       rb.ventas.filter(function (v) { return v.montoARS >= umbral; }).forEach(function (v) {
-        ventas.appendChild(el('li', { clase: 'item' }, [el('span', { texto: 'Vender ' + num(v.cantidad, 0) + ' de ' + v.simbolo }), el('b', { texto: dinero(v.montoARS) + (v.ganancia != null && v.ganancia < 0 ? ' · realiza pérdida' : '') })]));
+        ventas.appendChild(el('li', { clase: 'item' }, [el('span', { texto: 'Vender ' + num(v.cantidad, v.decimales || 0) + ' de ' + v.simbolo }), el('b', { texto: dinero(v.montoARS) + (v.ganancia != null && v.ganancia < 0 ? ' · realiza pérdida' : '') })]));
       });
       if (!ventas.firstChild) ventas.appendChild(el('li', { clase: 'muted', texto: 'No hace falta vender: ningún grupo se salió de la banda de ±' + Math.round(banda * 100) + ' puntos.' }));
       $('#reb-comision').textContent = 'Comisión estimada de todo el rebalanceo: ' + dinero(rb.comisionARS) + '. Para comprar, elegí instrumentos en Evaluar activo.';
